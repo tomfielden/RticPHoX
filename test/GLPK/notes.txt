@@ -1,0 +1,7 @@
+### 9/30/2011 ###
+Assuming the lib/bash.fragment has been sourced, we can check the following:
+
+%>
+javac GLPKSwig.java
+java GLPKSwig marbles.mod
+java GLPKSwig sudoku.mod

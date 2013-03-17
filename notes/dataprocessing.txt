@@ -1,0 +1,3297 @@
+5/26/2009 ---------------------------------------------------------------------------------------
+Afforestation
+
+There are two years for estimation and we assume we'll interpolate
+each year in between. Each item is tagged with 
+
+7/6/2009 ----------------------------------------------------------------------------------------
+Initial design for data processing:
+* We want to start with Afforestation as a class.
+* clearly it has a base class and perhaps more...
+* We also have a whole lot of named items in the config file,
+  we might need specialized access? Maybe we just need to "know" the
+  names...not comfortable...local helper class?
+
+7/7/2009 ----------------------------------------------------------------------------------------
+* Have a manager class (DataConfig.java) and a set of Subsector classes with
+  a base class (Subsector.java).
+* There are several stages in loading. 
+  * Initial load: only need data_config (non-user alterable). Create.
+  * Roll in the user-config changes.
+  * End product from each subsector is a (P,T) matrix pair. 
+
+7/8/2009 ----------------------------------------------------------------------------------------
+
+* Starting to get moving on replication. New idea: each subsector
+  represents a single file, not the whole subsector matrix! This means
+  it a time slice? No, let's have it handle multiple slices and know how
+  to aggregate them. Then we're not limited...
+
+7/13/2009 ---------------------------------------------------------------------------------------
+
+* Energy prices are the next issue. I've started replication, but this
+  is a neglected issue. All hard-coded values. What is a next
+  generation projection? Start with an EneryPrice object with energy
+  source subclasses for specifics. The UserConfig is a place to
+  consider embedding source information. There are two ways to
+  represent the user information: model versus year/price vector. I
+  think the data-based version is better. It matches the mandatory,
+  etc. We can provide all manner of user tools to fill in the data
+  fields for the user, but the touchstone is the data and possibly
+  some energy-type specific meta data, like the flavor of projection
+  chosen for interpolation. Or we simply say: no interpolation? Or
+  auto-interpolate when the data is incomplete. Better. We can always
+  store the results once validated by the user. Historical data is
+  special since it's fact. Any projector must respect this.
+
+7/15/2009 ---------------------------------------------------------------------------------------
+
+* Energy prices are mishandled by CAMA. Here's what should be happening...
+  * We start with a subsector (Oil_Gas_Fugitive, say) which has,
+    Region, ProjectLifetime (6), ProjectYear (2008), FinancialYear (2008), OutputEnergy (NG)
+  * FinancialYear means NOTHING!
+  * We're building a project that lasts ProjectLifetime starting in ProjectYear.
+  * The poject uses a particular energy source and we need to know the
+    price of that energy for each of the years of the project.
+  * We have a list of historic energy prices for each Region/Type and
+    some vain projections, but maybe not enough. We build a simple
+    projector for failsafe: we "know" energy/fuel prices for any
+    Region/Type/Year.
+  * We compute how much CH4 (tons) we capture and multiply it by the price
+    of natural gas (per ton). This is the "benefit".
+
+7/17/2009 ---------------------------------------------------------------------------------------
+
+* NPV(r, A - B) =?= NPV(r,A) - NPV(r, B) ?
+  (A1 - B1)*1 + (A2-B2)*r (A3 - B3)*r^2 == A1*1 + A2*r + A3*r^2 - B1*1 - B2*r - B3*r^2
+
+7/22/2009 ---------------------------------------------------------------------------------------
+
+* Down to afforestation. We want the DCF of a PWL-generated set of CF's.
+
+8/6/2009 ----------------------------------------------------------------------------------------
+* Have nearly all the XML processing for the basic preprocessing, but
+  We need to go further and introduce reusable elements
+  (functions). Actually we want ComputedNode to be parameteric
+  module...what do we really want? 
+
+* OK, The Transport Fuels deally is a <String, <String, Value>> double
+  lookup and we can hit it with two parallel String lists and expect a
+  parallel vector result. Single lookups are needed, etc. How to do
+  this? We can have the Transport stuff as a mild-mannered data object
+  that we operate on with a special functions. This could be just a
+  special tag for now which nicely skirts the issue. <Lookup2>object,
+  col1, col2</..> (except we don't have the comma operator yet.).
+
+* I want to be able to load another XML file and parse it as a
+  ComputedNode object. It should be a parameter to a particular tag
+  that expects an XML filename as a parameter and then answers
+  questions about it later. Something like this,
+
+  <LookupFile name="inflation">inflation_data.xml</LookupFile>
+  ...
+  <Lookup name="the_numbers">inflation, region, fuel</Lookup>
+  
+8/10/2009 ---------------------------------------------------------------------------------------
+* Converting to full parsing, not XML-parsing.
+* Jython may be the best way to go, but there are serious questions
+  about how well it will work, too heavyweight? Instead working with
+  JParsec.
+
+8/21/2009 ---------------------------------------------------------------------------------------
+* Have Jython fully operational and integrated (two weeks!). All subsectors being
+processed and first-year cpt values match pure-java versions which
+coincide with CAMA equivalents. There are known differences; corrected
+some obvious mistakes. 
+* The Jython version has serious performance issues; startup and
+recalculation. I've not yet made any attempt to speed things up. I
+still think the performance issue can be brought under control.
+* There are some remaining loose ends programmatically. The code knows
+things it should not know. Here are the pieces of supplemental info:
+  * Constants.py -- straight inport. 
+  * Simple keyed lookup values.
+  * projected data based on historical values.
+* The projected data is an issue. In the DataConfig.py there is an
+  opportunity to specify the different data kinds. This is important.
+* 
+
+8/31/2009 ---------------------------------------------------------------------------------------
+* Testing out Variant2 with some new ideas. Mostly a cleanup
+operation. The question on the table is: Should I retain INTS, DOUBLES
+and VARIATS as separate arrays or simply VARIANTS? The latter is
+preferred programatically, the former may offer too much performance
+advantage to forego.
+
+9/2/2009 ----------------------------------------------------------------------------------------
+* The new Variant (aka Variant2) is much cleaner than the original and
+is logical rather than constructed piecemeal. There are no String
+arrays or double arrays only Variant[] arrays. It's a bit of a
+performance hit, but tiny against the background of the application
+and it makes the code much stronger.
+* DCF is the last real challenge. No big deal, but it now has to be
+stated completely, not just in th special cases that are currently
+used. The two cases we has to support are a float discount rate and
+either a 1-D or 2-D array. If a 1-D array we apply the actual
+algorithm. In the case of a 2-D array, we create an array result or
+1-D array results. We therefore need to distinguish 1-D and 2-D
+arrays. DCF(r, <1D>) is equivlent to a dot product of <1D> and
+1/(1+r)^arange(N). Turns out to be quite simple and straight forward.
+Now...PLDCF is similar, but more complex. Lunch break!
+
+* LDCF (Linear Discounted Cash Flows)
+  // Assume discount: r, cash flows: LDCF = DCF(r,[b+0m, b+1m, b+2m, ..., b+(n-1)m])
+  // ldcf = b*[(1-d^n)/(1-d)] + m*[d*(1-d^(n-1))/(1-d)-(n-1)*d^n]/(1-d); d:=1/(1+r)
+  Notice DCF(r=0.05, cf=(1,3,5)) == LDCF(r=0.05, b=1, m=2, n=3)
+  This is just one segment, now we need to join multiple segments.
+* PLDCF (Piecewise Linear Discounted Cash Flows)
+  Really we discount each segment separately and then discount them as
+  if each segment were a cash flow.
+  In practice we'll be given a 1D array of lifetimes (n), and a two 2D
+  arrays of periods and accumulations.
+  Example: n = (5,8,4)
+           p = ((1,2,3),  ( 4, 3, 1,  2),( 2, 1, 3))
+	   a = ((7,11,14),(.1,.3,.7,1.5),(10,15,25))
+  Notice that n is a cut-off time for the process which is assumed to
+  plateau after the period. There is a mismatch here in that periods
+  are stated individually while accumulations are stated
+  collectively. A nice differentiator/accumulator feature would do
+  nicely here. Then we can say,
+  Example: n  = (5,8,4)
+           dx = ((1,2,3),( 4, 3, 1,  2),( 2, 1, 3))  == p
+	   dy = ((7,4,3),(.1,.2,.4,0.8),(10, 5,10))  == diff(a)
+  First, let's assume n is implied, not limited...
+  Then we have all the periods (dx) and the heights they achieve
+  starting from 0. The 'b', initial value is found by accumulating the
+  dy's and right shifting them.
+  Example: r    = 0.05
+           n    = (5,8,4)
+           dx   = ((1,2,3),  ( 4, 3, 1,  2),     ( 2, 1, 3))
+	   x    = accum(dx)
+	        = ((1,3,6),  ( 4, 7, 8, 10),     ( 2, 3, 6))
+	   y    = ((7,11,14),(.1,.3,.7,1.5),     (10,15,25))
+	   b    = rshift(y)
+	        = ((0,7,11), ( 0,.1,.3, .7),     ( 0,10,15))
+	   m    = diff(y)/dx
+	        = ((7,2, 1), (0.025, 0.066, 0.4),( 5, 5,10/3))
+           ldcf = LDCF(r,b,m,dx)
+	           ((0.0, 15.571428571428559, 34.21995464852607), 
+                    (0.1339488176222873, 0.47037037037036944, 0.3, 1.7476190476190459), 
+                    (4.761904761904746, 10.0, 52.1126228269085))
+  Now, these values need to be discounted as cash flows over non-unit
+  amounts of time. That is,
+           d   := 1/(1+r)
+	   e   := rshift(x)
+	        = ((0,1,3),  ( 0, 4, 7, 8),     ( 0, 2, 3))
+	   dcf  = (d^e * ldcf).sum()
+  OK. How to deal with the lifetime limits (n) if they are non-permissive
+           n    = (5,8,4)
+	   x    = min(n, accum(dx))  // new
+	        = ((1,3,5),  ( 4, 7, 8, 8),     ( 2, 3, 4))
+	   dx   = diff(x)            // new
+	        = ((1,2,2),  ( 4, 3, 1, 0),     ( 2, 1, 1))
+  Permissive lifetime limits deal with extensions beyond the stated
+  PWL descriptions. What if we don't do anything?
+  The real test is,
+      import Variant2 as Variant
+      TABLE    = Variant.open("/home/tomf/sandbox/Thesis/PHoX/data/Afforestation_FY.csv")
+      R        = Variant(0.05)
+      periods  = TABLE[("Period1", "Period2", "Period3")]
+      accums   = TABLE[("Accumulation1", "Accumulation2", "Accumulation3")]
+      lifetime = TABLE["ProjectLifetime"]
+      c__ha    = Variant.PLDCF(R, lifetime, periods, accums, lifetime)
+* Finally reference -> lookup. The sequential get.
+
+9/3/2009  ---------------------------------------------------------------------------------------
+* OK. It's all working again. 2.5 (long) days later we have the new
+  Variant with a well-designed and consistent structure. Now what?
+* The only "bullet-proofing" has been to withstand the data modules
+  and coding mistakes while developing the new Variant object. 
+  The only error reporting is,
+
+       System.out.printlin("Something bad happened near here");
+
+  This is adequate while still developing, but more sophisticaed
+  methods will be needed as progress is made.
+* The next major task is to create an on-line demo featuring the data
+  processing that's just been completed. What can this look like?
+  This first idea is to have not only all data tables and results made
+  visible, but all intermediate results! Actually this all comes as
+  one idea. Making visible any object within each python code
+  module. They each contain their relevant code tables. Now, each
+  module can be queried about it's contents (I sure hope!) through
+  introspection and each variable name can be accessed (not just the
+  perfunctory "cpt" and "tpot" variables). These variable names can be
+  searched and marked in the code text and then hyperlinked for
+  subsequently display on demenand. A complete viewport onto the
+  system. Naturally, some user interaction is desirable and
+  possible. Suppose we pop open a code module. All it's variables are
+  loaded and can be viewed. Then we could allow commands to be
+  executed in that environment so that we can see what things look
+  like of we scale some elements or combine them in some fashion. A
+  fine module developers tool. It at least allows some poking around
+  beyond mere passive viewing.
+* At first we need to build a list of all the code modules available
+  and which flavors are available. Again, the "TABLE" is  naturally
+  available. Then hyperlinked displays and finally pop-up table or
+  embedded table/array/value/map (dammit!) display. This means each
+  variant flavor needs a viewer. 
+* Beyond the code modules we need to combine the results into a pair
+  of (cpt,tpot) interpolated arrays. How to do this with the current
+  paradigm? We need stackers and interpolators (or visa/vera).
+* What we're saying is that there needs to be a higher-level control
+  module for the datamodules. This will loop over all of them or
+  accept them as an array and do the right thing. Damn, need years!
+  Well, that's another array of the same shape, but containing the
+  relevant years instead of arrays. That's three of a kind (cpt, tpot,
+  years) arrays. That is, each record represents (potentially) a
+  different statement year.
+* Beyond this is all the policy intstrumentation.
+
+9/28/2009 ---------------------------------------------------------------------------------------
+* So that was September. The online demo worked on time (last Thursday). 3 weeks of work.
+* --see: notes/server.txt----
+* Now, back to the data processing. The whole system of dataprocessing needs to be jython-ized.
+* We have "datamodules" with their lists of data files (pairs) and reference data
+  * Let's start writing a next-level module to control the data processing.
+  * This level will set the local variables that are passed to each individual data module.
+  * I think we can accomplish the inclusion of external parameter files with importing.
+    in the future we could put in code to insert db-stored data instead of file-stored (or both)
+    This plays with the idea of using a <rich:tree> to display all we have created.
+    The basic idea is to build all the remaining bridges then come back and make a Tree viewer.
+  * How should be have one module "call" another? Example,
+
+      >>> import com.carbonmodelinggroup.PHoX.util.Variant as Variant
+
+    allows jython modules to use the Variant object directly. It can say things like,
+
+      Variant.NPV(Variant(R), Variant(lifetime))   # not assuming R and lifetime are Variants
+
+  * I suppose there should be a higher-level object that supports the data processing controller.
+  * We can use a "Functions.py" file to make object calls look like local functions.
+  * The new object does not replace or supercede Variant, but supplements model building activity
+  * Given the datamodules map we need to create the CPT / TPOT structures for further work
+    Is this the job of this only module? I suppose it is for now. 
+    Notice there is no user involvement here.  As long as R remains fixed there is no need
+    to revisit this code during the user session.
+  * Clearly we need a conventient vstack! We'll pass in an array or arrays and get an array.
+  * How do we "get" the user config into the jython module? It's how we call for it.
+  * Remember we need to interpolate across the pair of data modules.
+  * We form a loop over the data modules pulling out the name and list of data files.
+    * We need to load the data files into a variant...
+    * if you "from xxx import *" then processing occurs immediately.
+    * Want to create a single Variant "table" based on list of variant tables, but only
+      for a subset of the columns.
+    
+  * I've mocked up the INTERP type for Variant, the handling of the PythonInterpreter. 
+    Is it the interpreter, the code string or the resulting variables? All? What?
+  * Introduced the notion that UPPER_CASE variables are invisible (like CONSTANTS)
+    as are functions and classes (like Variant).
+
+9/29/2009 ---------------------------------------------------------------------------------------
+
+* Interesting milestone. Can now run the whole pre-processing step with a one-line import
+  statement for a small top-level bit of python code: 
+  
+	./config/DataProcessing.py
+
+  >>> import DataProcessing as dp
+  >>> dp.result_tables[14]['NAME]
+  Electric
+  >>>
+
+  -- or --
+
+  >>> import com.carbonmodelinggroup.PHoX.util.Variant as Variant
+  >>> unit = open('DataProcessing.py').read()
+  >>> local_vars = {'RESULT_YEAR': 2007, 'R':.05, 'OCP':20}
+  >>> x = Variant(Variant(unit), Variant(local_vars))
+
+* Now we need to do the interpolation of the two pairs of vectors. How again?
+
+  * Need to know the years in which each value is stated. Each has "ProjectYear"
+
+    >>> Y1 = dp.first_result['ProjectYear']
+    >>> V1 = dp.first_result['cpt']
+    >>> Y2 = dp.second_result['ProjectYear']
+    >>> V2 = dp.second_result['cpt']
+    >>> M  = (V2 - V1)/(Y2 - Y1)
+    >>> B  = V1 - M*Y1
+
+  * Then we need to form YEARS = [2012, 2013, ..., 2020] and call
+
+    >>> CPT = M && YEARS + B
+
+    * where && denotes an outer product. But what is that in this context? What happens next?
+    * CPT and TPOT are 2D arrays where YEARS is one dimension and ITEMS is another.
+      It turns out that ITEMS is maleable, but there's a lot of qualitative information
+      that needs to be maintained. CPT is also updated in place via masking (queries).
+      (See: [CAMA]/model/DataManager2.py)
+    * Usages:
+      1) appendByCount 
+      	 appendByCopy
+
+      	 adds a bunch of "blanks" to fill in.
+      	 This suggests we maintain a list of objects (Variants?)
+	 Suppose we create objects in Python and maintain the list there? Slooow?
+	 Advantage of list-of-objects is the objects remain parallel and
+	 adding new ones is a matter of creating an array of them.
+	 The issue is that I'm not yet willing to commit to a Java object
+	 especially when we're talking about a data structure that could be handled by
+	 a Variant. Faily heavy-weight: {'Region': <single region>}
+
+      2) preprocessMandatoryGroupMasks
+      	 mask = self.getSpecialMask(Region=Region, Sector=Sector, Subsector=Subsector)
+	 P = self.P[:,mask]
+
+	 Getting masked subsets that are mearly views into the particular matrix are
+	 common. All the ones that follow employ this idea.
+
+      3) self.P[:,-1] = ones(Y) * price    # Our carbon tax is set to this price.
+
+      	 Here we are setting the last item in the "list" previously created as singleton.
+	 The issue is that we are apprently extending one "list" (P), but we've
+	 actually extended the whole structure, filling in new items with default or
+	 copied values.
+
+      4) self.P[:,mask] = where(p < price, price, p).reshape((Y,M))
+
+      	 Allows for setting of windowed matrix.
+
+      5) self.P[:, mask] /= value
+
+      	 A windowed operation.
+
+      Now we consider what happens. There's a lot more advanced usage in the 
+      WatchWindowXXX.py classes? Not really. It's all be done by then.
+
+      It feels a lot like an SQL table. The masks are really queries either for updating
+      or selecting. I think that actually using an SQL table would be a mistake because
+      we aren't doing that much querying and masking is so targetted. 
+
+      What about the List of Variants idea? It's just a Variant representing a List.
+      Each List item is an actual item and we can create-by-copy. The whole thing stays
+      synchronized by construction.
+
+      Then what happens to the outer product we're creating? We need to slice it up and
+      gather everything by respective item. Then we need the concept of gathering from
+      each item a particular value and forming another list. In this way a mask may be
+      applied to an VTYPE.ARRAY and return another VTYPE.ARRAY as a shallow copy.
+      The underlying objects will simply be referenced. This is List-of-Items.
+
+      The cornerstone concept is the 'mask'. 
+      How do we implement this? Just a kind of get. 
+      How do we generate a mask? What *is* a mask?
+      If we're generating a mask for use against a list then it must consist of
+      an array of integers (0 or 1).
+
+      Let's set up a pilot project. We'll build a list of items. Each item is a STRING_MAP
+      Suppose each item contains 'Region' set to 'CA' or 'WCI'. It's a separate representation,
+      Column-based versus Row-based. Suppose we start with Column-based (i.e. table)
+      We could then generate a whole bunch of row objects...why? More efficient in the end?
+      A STRING_MAP of ARRAYs into a ARRAY of STRING_MAPs. Can we build a specialized object
+      for this. We can use Variants as the worker bees, but this is getting tricky for the
+      basic Variant. Too many assumptions? What if we stick with the Table format instead?
+
+      If we stick with the column-centric table (STRING_MAP->ARRAY) then we can even store masks.
+      It's the "adding a row" that isn't clear. Another implication is that outer products
+      are represented by 2D array, not matrix. We return an array for each calulation just
+      as with "arange2". It's then consistent.
+
+      How about that. By using __getitem__ we can now say,
+      
+	>>> foo = Variant((1,2,3,4,5))
+	>>> bar = Variant((0,1,0,1,0))
+	>>> foo.get(bar)
+	(2, 4)
+	>>> foo[bar]       # same thing as .get(bar)
+	(2, 4)
+
+      Is there a sure-fire way to distinguish between mask and Index Lookup?
+      If the key array has a value larger than 1:               Index Lookup
+      If the key array is a different length than source array: Index Lookup
+      
+      Here's the bad case:
+
+      >>> foo = Variant((1,2,3,4,5))
+      >>> bar = Variant((0,1,0,1,0))
+      >>> foo[bar] 
+      (2,4)  --or-- (1,2,1,2,1) ??? Which do we get ???
+      <mask>        <index>
+      
+      Numpy solves this by type. If it's integers then it's integer lookup.
+      Booleans mean mask lookup. We could support booleans. Let's have a look...
+      Oh, crap. Now I remember by I can't support Boolean. It captures the integers!
+	 
+9/30/2009 ---------------------------------------------------------------------------------------
+
+* Continue building on the mask. We already use masks in the Where function. Let's make sure not
+  to break that. Things are looking good. There is already the '==', eq() function. It's now
+  beefed up. Can now say,
+
+      >>> mask = TABLE['Region'] == 'CA'
+      >>> TABLE['Sector'][mask]
+      (Forestry, Forestry, Forestry, Forestry)
+
+* There are all the >=, <, etc. numeric operations to support. They are not yet present.
+  The neat thing is that they produce boolean masks. We can fake them up to a point, but they
+  are clearly missing. TODO.
+
+* Now we need to address setting with a mask. This what we should (and do) get,
+
+      >>> import com.carbonmodelinggroup.PHoX.util.Variant as Variant
+      >>> A = Variant(('a','b', 'c'))
+      >>> B = Variant((0,2))
+      >>> C = Variant(('tom', 'shu'))
+      >>> M = Variant((0,1,1)).toMask()
+      >>> A[M]
+      (b, c)
+      >>> A[M] = 'x'
+      >>> A
+      (a, x, x)
+      >>> A[M] = C
+      >>> A
+      (a, tom, shu)
+      >>> A[B] = 'y'
+      >>> A
+      (y, tom, y) 
+      >>> A[B] = C
+      >>> A
+      (tom, tom, shu)
+
+* Whither the outer product? It occurs to me that this is nearly done with the get().
+  Actually, all that's happening with the get is arange2 is creating a 2D array and the 
+  lookup is replacing it with a 2D array. It's arange2 that does the outer product...ish.
+  What arange does is take an array of stop-values and turn each one into an array of ranges.
+  All the arange2 says (for Python) that we can provide start and stop values which could each
+  be (parallel) arrays.
+
+* What we want to do now is form an outer product just like arange where we provide a 1D array
+  and produce a 2D array. Here's a recap,
+
+    >>> Y1 = dp.first_result['ProjectYear']
+    >>> V1 = dp.first_result['cpt']
+    >>> Y2 = dp.second_result['ProjectYear']
+    >>> V2 = dp.second_result['cpt']
+    >>> M  = (V2 - V1)/(Y2 - Y1)
+    >>> B  = V1 - M*Y1
+
+  * Then we need to form YEARS = [2012, 2013, ..., 2020] and call
+
+    >>> CPT = M && YEARS + B
+
+  * The issue, once again, is that of product type. The M is a vector and Years is also a vector
+    by the two vectors are not the same length and should be multiplied differently. It's
+    actually vector multiplication! The problem is we've been using array multiplication
+    throughout and we need to signal the change. Here's what we want-ish (and get),
+
+    >>> X = Variant((1,2,3))
+    >>> Y = Variant((4,5))
+    >>> Variant.outer(X, Y)
+    ((4,5),(8,10),(12,15))
+
+    --or--
+
+    >>> from Functions import *
+    >>> outer((1,2,3), (4,5))
+    ((4,5),(8,10),(12,15))
+
+  * The issue is that *if* we simply key of length mismatch we could be caught by,
+
+    (1,2) * (4,5) becomes (4,10) -or- ((4,5),(8,10)), which is uncomfortable. 
+
+  * Option 1 is to simply create the "outer" product that we need.
+    Option 2 is to signal the *,mult function that vector operations are in effect.
+  * The question is: how useful is this? What is the convenience worth? Can we set
+    one of the Variants to be a "vector" as a property tag and shift the mult behavior?
+    It's only the mult behaviour that needs alteration.  Let's do "outer".
+
+  * Now we can move forward with,
+
+    >>> Y1 = dp.first_result ['ProjectYear']
+    >>> Y2 = dp.second_result['ProjectYear']
+    >>> V1 = dp.first_result ['cpt']
+    >>> V2 = dp.second_result['cpt']
+    >>> M  = (V2 - V1)/(Y2 - Y1)
+    >>> B  = V1 - M*Y1
+
+  * Then we need to form YEARS = [2012, 2013, ..., 2020] and call
+
+    >>> YEARS = Variant.arange(Variant(2012), Variant(9))
+    >>> CPT = Variant.outer(M, YEARS) + B
+    --or--
+    >>> from Functions import *
+    >>> CPT = outer(M, arange2(2012, 9)) + B
+
+  * Let's check with the first non-trivial item (#3)
+    Y1[3] = 2006                Y2[3] = 2016
+    V1[3] = 6.465956039132465   V2[3] = 7.694710051073995
+    M     = 0.12287540119415308
+    B     = -240.0220987563386
+    CPT   = (7.2032084462973955, 7.326083847491532, 7.448959248685696, 7.571834649879833, 
+    	     7.694710051073997, 7.817585452268162, 7.940460853462298, 8.063336254656463, 
+	     8.186211655850599)
+
+  * And we're done with interpolation functionality. Time to implement it! Done. Need to check...
+  * So, we've cleaned things up a bit and now have,
+
+  >>> from DataProcessing import *
+  >>> cpt[3]
+      (7.2032084462973955, 7.326083847491532, 7.448959248685696, 7.571834649879833, 
+       7.694710051073997, 7.817585452268162, 7.940460853462298, 8.063336254656463, 
+       8.186211655850599)
+
+  * Here's the major activities starting tomorrow, 
+    def preprocessData(self):
+        self.preprocessMandatoryGroupMasks()
+        self.preprocessAdditionality()
+        self.preprocessPriceLimits()
+        self.preprocessEarlyActionCredits()
+        self.preprocessAuctionedAllowances()
+        self.preprocessRegionDiscount()
+     
+    Next, the model must be carefully loaded and it's processor triggered. We'll need to look...
+    
+10/01/2009 --------------------------------------------------------------------------------------
+
+* We can load the UserConfig.py file and make the associated Variant available as a local 
+  variable to subsequent modules. They can take what they want. In practice, may spoon-feed.
+
+* Here's a compilation of operations we need to perform to do the pre-LP steps.
+  We need to allow this to be extensible. Each step is an operation of the pre-LP data.
+  Notice that the raw_data to cpt/tpot/* is itself a pre-LP step, but is not an operation
+  unless you allow trivial->dataset as an operation. We need to formalize what the "dataset"
+  actually consists of. Some pre-LP steps will augment the dataset for later steps. By this
+  standard then raw_data is a pre-LP step.
+
+* We'll hit "mandatory" on a separate pass. It's more complex than I remembered.
+
+* preprocessAdditionality
+
+  This only applies to non-mandatory offset items. This means that we must mask off our
+  data before we touch this. Nonetheless we can start to craft the code.
+  additionality_level == 1 -> we accept everything.
+  This is purely a capacity constraint over affected items.
+  additionality_level == n -> we add (add_n, add_(n+1), ..., add_5) and multiply this by tpot.
+  It would be nice to have this pre-rendered so that we just grab the right level.
+  A masked multiply...we need to do a doublt masking....wish I could create a mask easily.
+  
+  I just want a mask of the right size that I can easily set some values directly.
+  
+    >>> m = Variant.createMask(5)        # (T,  T,  T,  T,  T)
+    >>> m.setFalse()       # (F, F, F, F, F)
+    >>> m[0].setTrue()     # (T,  F, F, F, F)
+    >>> m[1].setTrue()     # (T,  T,  F, F, F)
+    >>> a = arange(5)      # (0, 1, 2, 3, 4)
+    >>> a[m] = (7,8)       # (7, 8, 2, 3, 4)
+
+  Next up is slicing. It's not strictly necessary, but a good idea to have for testing and dev.
+
+  Slicing is handled by converting the given PySlice into a String and have the convention
+  that if we get(<String>) then we must be slicing.
+
+    >>> A = Variant((1,2,3,4,5))
+    >>> A[::-1]           # (5,4,3,2,1)
+    >>> A[:3]             # (1,2,3)
+    >>> A[:-1]            # (1,2,3,4)
+    >>> A[2:]             # (3,4,5)
+
+  Keep in mind that Slicing is not Masking. For example,
+
+    >>> A[:2] = (7,8)     # Doesn't work! Not in Python, not here either.
+
+  This *does* work and it's what makes the additionality work,
+
+    >>> A = Variant(( 1,  2,  3,  4,  5))
+    >>> B = Variant((.2, .3, .4, .5, .6))
+    >>> m = mask(a.size())
+    >>> m[0,1].setFalse()   # (F, F, T, T, T)
+    >>> A[m] *= B[m]        # (1, 2, 1.2, 2.0, 3.0)
+
+* preprocessPriceLimits
+  
+  Price Ceiling means adding a specially typed item at "price" and infinite supply.
+  Price Floor means something different for Offsets and Capped items.
+  	For Offsets, we just update all of them. A "min" function over an array.
+
+    >>> a = arange(5)       # (0,     1,    2,    3,    4)
+    >>> m = mask(a.size())  # (T,  T, T, T, T)
+    >>> m[0,4].setFalse()   # (F, T, T, T, F)
+    >>> a[m] = Max(a[m], 2) # (0,     2,    2,    3,    4)      # be sure to use Variant.Max
+
+        For Cap&Trade we need to identify all the ones that are affected and partition them
+	This means that if 5 items are priced below floor then we create a new 5 items
+	and split the capacities between them according to the "internally traded" percentage
+	and to the affected 5 we reset their prices to the floor. We leave the others alone.
+	Notice that "affected" means that an item's price drops below the floor *in some year*.
+
+  To move this concept forward we need a deep copy (or just a copy). The problem is that we
+  expect to be presented with a data structure containing a STRING_MAP to some 1D and 2D 
+  arrays. Since it's not clear if the arrays are 1- to 2-dimensional without testing (or worse)
+  we need to require that a copy of some portion of the arrays be made, tacked onto the end
+  and then updated with new values. Clearly a deep copy is required else the updating of the 
+  newly created values will actually alter the originals. And that's bad.
+
+    >>> A = Variant({'a':(1,2,3), 'b':((4,5),(6,7),(8,9)), 'c':('fee', 'fie', 'foe')})
+
+  Suppose we wanted to append the first two elements onto the end as in,
+
+    ({'a':(1,2,3,1,2), 'b':((4,5),(6,7),(8,9),(4,5),(6,7)), 'c':('fee','fie','foe','fee','fie')}
+
+  Clearly a mask such as,
+
+    M = (T, T, F)
+
+  would be very handly. And we would expect to apply this mask over each element in the
+  STRING_MAP. If we said "A.copy(M)" then we would see that A is a STRING_MAP so that the
+  mask M should be applied to the elements inside...that is if they are arrays. We should
+  say that M applies to the first matching array (of same length). Perhaps this should just
+  be the first array else an error. This more properly as "masked_copy()". We still haven't
+  dealt with the deep copy aspect except to cloud the issue. Let's make "copy()" be without 
+  params for now. It's just a straight deep copy.
+
+    >>> b = a[m]         # shallow copy
+    >>> b = a[m].copy()  # deep copy
+
+  Next we need an append feature. This makes sense for ARRAY's in an obvious way, but
+  with STRING_MAP's we're saying that if we push a STRING_MAP into a STRING_MAP that they
+  should line up and call append on the stripped items just as we do with get() over an
+  array of keys.
+
+    >>> A = Variant({'a':(1,2,3), 'b':((4,5),(6,7),(8,9)), 'c':('fee', 'fie', 'foe')})
+    >>> B = Variant({'a':A['a'], 'b':A['b']})
+    >>> A.append(B) 
+        # {a:(1,2,3,1,2,3), c:(fee,fie,foe), b:((4,5),(6,7),(8,9),(4,5),(6,7),(8,9))}
+
+  That 'B' step is the ugly one. On the other hand, it's the only one left to solve and it
+  surely involves a copy and a mask.
+
+10/02/2009 --------------------------------------------------------------------------------------
+
+  We need a new way to access the data in Variant. The Mask is an idea that is nice and 
+  represents subsets as a pattern over an array. Now we need to represent subsets over
+  maps. For this we need sets associated with the two types of maps, STRING and INT.
+
+  Introducing: INT_SET and STRING_SET
+
+  The idea is to extend get(). Currently we have the following,
+
+    >>> A = Variant({'a':(1,2,3), 'b':'beta', 'c':((1,2),(3,4))})
+    >>> A['a', 'b']      # same as A[('a', 'b')]
+    ((1, 2, 3), beta)
+    >>> A['a', 'b', 'b']
+    ((1, 2, 3), beta, beta)
+
+  What we're seeing is that we reach into a STRING_MAP with a list of STRINGs and
+  retrieve a list of values based on the map. What we also want to be able to do is to 
+  reach into a STRING_MAP and retrieve another STRING_MAP that represents a subset. As in,
+
+    >>> x = <a set containing 'a', 'b'>  # What does this look like?
+    >>> A[x]
+    {a:(1,2,3), b:beta}
+    
+  There is a PySet. Here's how to access it...
+
+    >>> s = set('abc')      # set(['b', 'a', 'c'])
+    >>> 'a' in s
+    True
+    >>> 5 in s
+    False
+    >>> t = set((1,2,3,'abc'))
+    >>> a = 'abc'
+    >>> a in t
+    True
+
+  Now, we realize that PySet is comparable to Set<Variant>, but is this what we want? Too loose.
+  I think forcing this to be more restricted gives a performance boost. Maybe. The issue is
+  one of comparing. This is simply __eq__ or eq(). This concept is related to _cmp(other).
+  The issue is that it's quite natural to create Set<Variant>, but then we have the issue of
+  compare and getting in the way of the HashMap implementation. Is a Variant the key in a
+  Variant->Variant map? Had problems with this before. Hashing is an issue. Performance may
+  be impacted catastrophically. Not sure. String and Int are so much more hashable. I think
+  that best move now is be strong and condition the set up front. Either pure INT or pure STRING.
+
+    >>> s = set([1, 2, 3, 3])  # set(1,2,3)
+    >>> v = Variant(s)         # {1,2,3}
+
+  Can now create a Variant from a PySet and print it. Pure INT_SET or STRING_SET only.
+  We to get a set from STRING_MAP and INT_MAP. Want to be able to add and remove elements, 
+  want to be able to do union, intersection, set difference. We need to revisit getKeys().
+  rename to "keys()" and make sure "toArray()" is available. First, let's get "copy()" to work.
+
+  OK. We can copy (deep == shallow). If we create an empty set, it's default type is STRING_SET
+  But, if we add an element, the empty set will switch to the appropriate type.
+
+  How do we loop over all the keys returned in a Variant.*_SET...Not sure.
+  We need a way to get keys and values form a map. How?
+
+  Internally we can write,
+
+    // v is a STRING_MAP
+    for(String k: v.getStringSet()) interp.set(k, v.get(k));
+
+  Now we carefully distinguish between getXXX and toXXX. In 
+  
+    getXXX pulls out the internal type. A fetch.
+    toXXX  returns a Variant of the XXX type. A conversion.
+  
+  And this gives up the notion we want,
+
+    >>> A = Variant({1:(1,2,3), 2:(4,5,6), 5:(7,8,9), 9:'duh'})
+    >>> K = a.keys()
+    >>> A[K]                                # is same as A
+    >>> B = K.toArray()                     # (2, 9, 1, 5)
+    >>> A[B]
+    ((4, 5, 6), duh, (1, 2, 3), (7, 8, 9))  # same order as B, as usual.
+    
+  Finally, we have the subset grab we asked for...(shallow copy).
+
+    >>> A = Variant({1:(1,2,3), 2:(4,5,6), 5:(7,8,9), 9:'duh'})
+    >>> C = Variant(set((1,9)))
+    >>> A[C]
+    {9: duh, 1: (1, 2, 3)}
+
+  how do you add a new value to a set from Python?
+
+    >>> A = Variant.createIntSet()
+    >>> B = Variant(set((1,2)))
+    >>> A.append(B)
+
+    >>> A = Variant.createIntSet()
+    >>> A.append((1,2,3,5))
+
+  TODO: extend +, -, * to INT_MAP, STRING_MAP. 
+
+10/03/2009 --------------------------------------------------------------------------------------
+
+  What we really need to do next is to apply get(<mask>) to X_MAP. We skip down a level and apply
+
+    >>> A = Variant({'a': (1,2,3), 'b':(4,5,6), 'c':(7,8,9)})
+    >>> M = Variant.createMask(3)
+    >>> M[1].setFalse()
+    >>> A[M]
+    {a: (1, 3), c: (7, 9), b: (4, 6)}
+
+  QUESTIONS:
+    So much for get(), what about set()? Can we say A[M] = <something>?
+    Similarly, what about slices? Can we say A[1:3] as easily as A[M]?
+
+  Slices:
+    Currently we capture the slice, but set it's type to STRING. 
+    It can be encoded/decoded as a string, but it's really a different type altogether.
+    How is it used? We should create a slice explicityly by passing in a string as in,
+
+      public static Variant createSlice(String slice) {...}
+      public Variant slice(Variant s) {...} DEPRECATED
+
+    We don't "slice" explicityly anymore. If you do ARRAY.get(STRING) then we assume
+    what you mean is ARRAY.get(SLICE) and say ARRAY.get(createSlice(STRING))
+
+    from this point slicing is pretty easy. A private helper function may be used, but
+    since it doesn't have to decode a string it's a lot simpler. I does still have to deal
+    with negative indices once it's knows the size the the array to which it's being applied...
+
+    What a slice is, is a triplet of integers. How to represent this? The obvious way is to
+    simply say Array<Integer>, but simpler is Integer[] and just assume 3 elements always. Done.
+
+    Now we can manually create slices as,
+
+      >>> Variant.createSlice(":2")
+      (0, 2, 1)
+
+      >>> A = Variant((1,2,3,4,5))
+      >>> S = Variant.createSlice(":2")   # triple: (0, 2, 1) == (start, stop, step)
+      >>> A[S]
+      (1, 2)
+      >>> A[:2]   # and this short-hand still works.
+      (1, 2)
+
+    The rules for slicing X_MAP are now the same as masking X_MAP. As in,
+    
+      >>> A = Variant({'a': (1,2,3), 'b':(4,5,6), 'c':(7,8,9)})
+      >>> A[1:]
+      {a: (2, 3), c: (8, 9), b: (5, 6)}
+
+    Bloody brilliant if I do say so myself. And that after only 6 days of obsessive compulsion!
+
+    TODO:
+      Extend +, -, * to INT_MAP, STRING_MAP. 
+      X_MAP[MASK] = WTF? An across the board initialization of all mapped arrays? Perhaps.
+
+10/04/2009 --------------------------------------------------------------------------------------
+
+  Let's elavate the mask idea to an bonefide type, MASK. First, we do away with,
+
+    isBooleans()  // OBSOLETE.
+
+    >>> M = Variant.createMask((1,0,1,1))
+
+  Having an issue with: 
+    >>> M = Variant.createMask(3)
+    >>> M[1].setFalse()            # should be (T, F, T)
+  But, this isn't really an issue. We do not get a reference to index 1, but a new BOOL variant
+
+    >>> M[1] = 0        # (T, F, T), this works.
+
+  There is a basic problem when it comes to slicing a mask. Masks contain an array of primitives
+  while ARRAY is an array of Variants. The shallow copy is off by one level. 
+  At the same time slicing is a bit complicated and the applySlice would have to do double duty,
+  setting and getting. If we hand in a null value to mean "get" then we're OK.
+  But it get's worse. We're applying slice to MASK and ARRAY and if we use just get, it's OK...
+  The preference is to index into the underlying array which differs between the two cases and
+  to work they have to pass though the same looping code.
+
+10/05/2009 --------------------------------------------------------------------------------------
+
+Let's do some polishing. First up: a value is an arbitrarily long array of that same value. 
+* This convention is handled through get(i) returning *this* in the case of non-array.
+* Here's the types to check and make sure they operate correctly.
+
+  ARRAY, INT_SET, STRING_SET, SLICE, MASK, indexed get.
+
+* We need to make sure get/set work for each combination. Let's start with ARRAY,
+
+  ARRAY[ARRAY], ARRAY[SLICE], ARRAY[MASK], ARRAY[INT_SET]
+  
+    >>> A = arange(5)                          # (0,1,2,3,4)
+    >>> B = Variant(('a','b','c','d','e'))
+    >>> I = Variant((0,0,3,3))
+    >>> A[I]
+    (0,0,3,3)
+    >>> A[I] = 7                               # (7, 1, 2, 7, 4)
+    >>> A[I] = B                               # (b, 1, 2, d, 4)   "uses up" the source array.
+    >>> A[3:] = 9                              # (b, 1, 2, 9, 9)
+    >>> M = Variant.createMask((1,0,1,0,1))    # (T, F, T, F, T)
+    >>> A[M]                                   # (b, 2, 9)
+    >>> A[M] = ('foo','bar','baz','far','car') # (foo, 1, baz, 9, car)
+    >>> A = arange(5)                          # (0,1,2,3,4)
+    >>> A[M] = ('a', 'b')                      # (a,1,a,3,a)   which is weird: you asked for it
+      	     	   			       # the reason is arrays repeat across integers.
+    >>> A = arange(5)                          # (0,1,2,3,4)
+    >>> A[3:] = ('a', 'b')                     # (0,1,2,a,b) 
+    >>> A[3:] = ('a')                          # (0,1,2,a,a)  again, repeated array. a const.
+
+    >>> M = Variant((1,0,1,0,1)).toMask()
+    >>> N = Variant((1,1,0,0,0)).toMask()
+    >>> M[N] = 1                               # (T, T, *, *, *)  # * means unchanged
+    >>> M[N] = 0                               # (F, F, *, *, *)
+    >>> M[N] = (0,1)                           # (F, T, *, *, *)
+
+    >>> M = Variant((1,0,1,0,1)).toMask()
+    >>> N = Variant((1,1,0,0,0)).toMask()
+    >>> M + N                                  # (T,T,T,F,T)
+    >>> M + 1                                  # (T,T,T,T,T)
+    >>> (0,1,0,1,1) + N                        # (T,T,F,T,T)
+
+    >>> M = Variant((1,0,1,0,1)).toMask()
+    >>> N = Variant((1,1,0,0,0)).toMask()
+    >>> M * N                                  # (T,F,F,F,F)
+    >>> M * 1                                  # (*,*,*,*,*)
+    >>> 0 * M                                  # (F,F,F,F,F)
+    >>> M * (0,1,1,1,0)                        # (F,F,T,F,F)
+  
+    >>> M = Variant((1,0,1,0,1)).toMask()
+    >>> N = Variant((1,1,0,0,0)).toMask()
+    >>> -M                                     # (F,T,F,T,F)
+    >>> M*(-M)                                 # (F,F,F,F,F)
+    >>> M-N                                    # (T,F,T,T,T) == M + (-N)
+
+    >>> A = Variant(('a','b','c','d','e'))
+    >>> M = Variant((1,0,1)).toMask()
+    >>> A[(0,1,4)] = (9,8,7)                   # (9,8,c,d,7)
+    >>> A[(0,1,4)][M] = ('x','y','z')          # Fails to alter A. Alters temporary A[(0,1,4)].
+
+  Let's deal with append();
+
+    >>> M = Variant((1,0,1,1,0)).toMask()
+    >>> M.append(M)                            # (T,F,T,T,F,T,F,T,T,F)   M is un-altered!
+    >>> M.append((0,0,1))			     # (T,F,T,T,F,F,F,T)
+
+  Recall the "push-down" concept
+
+    >>> M = Variant((1,0,1)).toMask()
+    >>> A = Variant({'a': (1,2,3), 'b':(4,5,6), 'c':(7,8,9)})
+    >>> A[1:]                                  # {a: (2, 3), c: (8, 9), b: (5, 6)}
+    >>> A[M]                                   # {a: (1, 3), c: (7, 9), b: (4, 6)}
+    >>> A[(0,1)]                               # {a: (1, 2), c: (7, 8), b: (4, 5)}
+    >>> A[1:] = ('x','y')                      # {a: (1, x, y), c: (7, x, y), b: (4, x, y)}
+    >>> A = Variant({'a': (1,2,3), 'b':(4,5,6), 'c':(7,8,9)})
+    >>> A[M] = ('x','y', 'z')                  # {a: (x, 2, z), c: (x, 8, z), b: (x, 5, z)}
+    >>> A = Variant({'a': (1,2,3), 'b':(4,5,6), 'c':(7,8,9)})
+    >>> A[(0,1)] = ('x','y')                   # {a: (x, y, 3), c: (x, y, 9), b: (x, y, 6)}
+
+  Returning to the set concept and their types.
+ 
+    >>> S = Variant(set((1,3,3,5)))            # {1, 3, 5}
+    >>> T = Variant(set((5,6,9)))              # {5, 6, 9}
+    >>> S + T                                  # {1, 3, 5, 6, 9}
+    >>> S * T                                  # {5}
+    >>> S - T                                  # {1, 3}
+    >>> T - S                                  # {6, 9}
+
+    >>> A = Variant({1:('a','b','c'), 2:('d','e','f'), 3:('g','h','i')})
+    >>> A[S]                                   # {1: (a, b, c), 3: (g, h, i)}
+    >>> A[T]                                   # {}
+
+    >>> A = Variant(('a','b','c','d','e'))
+    >>> S = Variant.set((2,3))
+    >>> A[S]                                   # (c, d)
+    >>> A[S] = (4,5,6,7,8)                     # (a, b, 6, 7, e)  behaves like a mask.
+
+    # An INT_SET is behaves like a sparse MASK
+
+    >>> A = Variant({'a':('a','b','c'), 'b':('d','e','f'), 'c':('g','h','i')})
+    >>> S = Variant(set((2,0)))
+    >>> A[S] = (1,2,3)                         # {a: (1, b, 3), c: (1, h, 3), b: (1, e, 3)}
+
+  TODO: The append() function is still not fully supported for X_MAP.
+
+10/06/2009 --------------------------------------------------------------------------------------
+
+  NOTE: The append function should be in-place, not static. 
+  
+  First we fix up the array and mask handling.
+  We can append Variants fungible to ARRAY to BOOL, INT, DOUBLE, STRING and create ARRAY
+  the preserved the original type. We do alter the original through replacement.
+
+    >>> A = Variant(5)
+    >>> A.append((1,2,3,4))                        # (5,1,2,3,4)
+    >>> B = Variant(5).append((1,2,3,4))           # same thing
+    >>> A = mask(1).append((1,0,1,1))              # (T,T,F,T,T)
+    >>> A = mask((1,0)).append((1,0,1,1))          # (T,F,T,F,T,T)
+    >>> A = Variant(3.2).append(mask((1,0,1,1)))   # (3.2, 1.0, 0.0, 1.0, 1.0)
+    >>> A = mask(1).append(('F', 'T', 'T'))        # (T,F,T,T)
+    >>> A = mask((1,0)).append(('F', 'T', 'T'))    # (T,F,F,T,T)
+    >>> A = mask(()).append(('F', 'T', 'T'))       # (F,T,T)
+    >>> A = Variant(5).append(('1', '3', '72'))    # (5,1,3,72)
+    >>> A = Variant((1,2)).append(('1','3','72'))  # (1,2,1,3,72)          since (x) == x
+    >>> A = Variant((2.0)).append(('1','3','72'))  # (2.0, 1.0, 3.0, 72.0) since (x) == x
+    >>> A = Variant(2.0).append(('1','3','72'))    # (2.0, 1.0, 3.0, 72.0)
+
+  What about: createMask() versus toMask() ... one is static, the other a method. 
+  The method (toMask()) will return "this" if already a MASK else call createMask().
+  the static (createMask()) will return a copy of a MASK is handed a MASK.
+
+  Now we deal with append for maps and sets.
+  If we append a map to a map, we must line up the keys. If no key match not append. It's not
+  a cheap set() function. And we don't cross types. INT_MAP to INT_MAP, STRING_MAP to STRING_MAP.
+
+  What if we pass in an array to a X_MAP? We must mean append this array to each element.
+
+    >>> A = Variant({'a':(1,2,3), 'b':(4,5,6)})
+    >>> B = Variant({'a':(10,11), 'e':'bletch'})
+    >>> A.append(B)                               # {'a':(1,2,3,10,11), 'b':(4,5,6)}
+
+    >>> A = Variant({'a':(1,2,3), 'b':(4,5,6)})
+    >>> B = Variant({'a':(10,11), 'e':'bletch'})
+    >>> A.append(B).append(B)                     # {'a':(1,2,3,10,11,10,11), 'b':(4,5,6)}
+
+    >>> A = Variant({'a':(1,2,3), 'b':(4,5,6)})
+    >>> A.append(A)                               # {'a':(1,2,3,1,2,3), 'b':(4,5,6,4,5,6)}
+
+    >>> A = Variant({'a':(1,2,3), 'b':(4,5,6)})
+    >>> A.append(4)                               # {'a':(1,2,3,4), 'b':(4,5,6,4)}
+
+    >>> A = Variant({'a':3,'b':(4,5,6),'c':{'d':4,'e':(7,8,9)}})
+    >>> A.append(4)                               # {a:(3,4),c:{d:(4,4),e:(7,8,9,4)},b:(4,5,6,4)}
+
+    >>> A = Variant({1:3,2:(4,5,6),3:{'d':4,4:(7,8,9)}})
+    >>> A.append(4)                               # {2:(4,5,6,4),1:(3,4),3:{d:(4,4),4:(7,8,9,4)}}
+
+    >>> A = Variant({1:3,2:(4,5,6),3:{'d':4,4:(7,8,9)}})
+    >>> A.append({4:(10,11)})                     # no change
+    >>> A.append({3:{'d':(12,13)}})               # {2:*, 1:*, 3:{d:(4,12,13),4:*}}
+
+  Finally (for appending) we consider X_SET. What does appending mean?
+  It must mean union (add()). Already defined. Here's what we see,
+
+    >>> A = Variant(set((1,2,3)))
+    >>> A.append((3,4,5))                         # {1,2,3,4,5}
+
+    >>> A = Variant(set((1,2,3)))
+    >>> B = Variant(set((3,4,5)))
+    >>> A.append(B)                               # {1,2,3,4,5}
+
+    >>> A = Variant(set((1,2,3)))
+    >>> A.append(4)                               # {1,2,3,4}
+
+    >>> A = Variant(set((1,2,3)))
+    >>> A.append('5')                             # {1,2,3,5}
+
+  Let's go a little further and define +/-/* for INT_SET,
+
+    >>> A = Variant(set((1,2,3)))
+    >>> A + 5                                     # {6,7,8}, A unchanged
+    >>> A + 5.2                                   # {6,7,8}, A unchanged
+
+  The rules for STRING_SET are different. This is just appending.
+
+    >>> A = Variant(set(('a','b','c')))
+    >>> A + 'd'                                   # {a,b,c,d},   A unchanged
+    >>> A + ('c','d')                             # same
+    >>> A + set('c','d')                          # same
+    >>> A + 5                                     # {a,b,c,'5'}, A unchanged
+    >>> 5 + A                                     # same
+
+  And there are some misc. tricks
+
+    >>> 5 + Variant('6')                          # 11
+    >>> Variant('6') + 5                          # '65'
+    >>> (1,2,3) + Variant(6)                      # (7,8,9)
+
+  Subtraction is a separate issue. There could be some special definitions made.
+
+    >>> A = Variant(set((1,2,3)))
+    >>> A - 6                                     # {-3,-4,-5}
+
+  So far so good. I think we're ready to have another look at model pre-processing.
+  This is where we roll in the majority of the policy parameters. Should be fun. After lunch...
+
+      ========================================================================
+
+  Again (from 10/1/2009) here's the order of tasks.
+
+    def preprocessData(self):
+        self.preprocessMandatoryGroupMasks()   // Save for later
+        self.preprocessAdditionality()         // has some work done already
+        self.preprocessPriceLimits()
+        self.preprocessEarlyActionCredits()
+        self.preprocessAuctionedAllowances()
+        self.preprocessRegionDiscount()
+  
+  self.preprocessAdditionality():
+
+    recall that we already pre-process the additionality we see in the tables through,
+
+      Add = []
+      Add.append(first_table['Add_5'])
+      Add.append(first_table['Add_4'] + Add[-1])
+      Add.append(first_table['Add_3'] + Add[-1])
+      Add.append(first_table['Add_2'] + Add[-1])
+      Add.append(first_table['Add_1'] + Add[-1])
+      Add = Add[::-1]
+      # Assert Add[0].sum() == Add[0].size()  # i.e. 100%
+
+   First let's do a better job with the Additionality. Want a 5xN array of cumsum. Here's how,
+
+      >>> ADDITIONALITY_FIELDS = ('Add_1', 'Add_2', 'Add_3', 'Add_4', 'Add_5')
+      >>> Add2 = first_table[ADDITIONALITY_FIELDS[::-1]].xcumsum()[::-1]   # 5xN array
+
+   Test out cumsum(), the longitudinal accumulation (along arrays)
+  
+      >>> Variant((1,2,  3)).cumsum()                  #  (1, 3,  6)
+      >>> Variant((1,2.0,3)).cumsum()                  #  (1, 3.0,6)
+      >>> Variant(((1,2,3),(4,5,6),(7,8,9))).cumsum()  # ((1, 3,  6), (4, 9, 15), (7, 15, 24))
+      >>> Variant({'a':(1,2,3), 'b':(4,5,6)}).cumsum() # {a: (1, 3, 6), b: (4, 9, 15)}
+      >>> Variant({'a':(1,2,3), 'b':4}).cumsum()       # {a: (1, 3, 6), b: 4}
+   
+   Test out xcumsum(), the horizontal accumulation across arrays.
+
+     >>> Variant(((1,4),(2,5),(3,6))).xcumsum()        # ((1,4),(3,9),(6,15))
+     >>> Variant((1,2,3)).xcumsum()                    # (1,3,6)
+
+   Expand isTrue() to include arrays with strict T requirement,
+
+     >>> Variant(1).isTrue()                    # True
+     >>> Variant((1,1,1)).isTrue()              # True
+     >>> Variant((1,0,1)).isTrue()              # False
+     >>> Variant(((1,1,1),(1,1),1)).isTrue()    # True
+     >>> Variant(((1,1,1),(1,0),1)).isTrue()    # False
+     
+   What needs to happen next is to identify the capacities that need to be altered.
+   That is, the "offsets". If we did know the "offsets" then what do we do? Here's the idea,
+   cpt (C) and tpot (T) are NxY arrays. Assume A is an N array from which we generate a mask,
+   Suppose R stands for Region, M for mask, A for a particular additionality level.
+
+     >>> T = Variant(((1,2),(3,4),(5,6),(7,8))) # NxY            N = 4, Y = 2
+     >>> R = Variant(('a','b','a','d'))         # (a,b,a,d)      N array
+     >>> M = R == 'a'                           # (T,F,T,F)      N mask
+     >>> A = Variant((0.5, 0.2, 0.3, 0.9))      #                N array
+     >>> T[M] *  A[M]                           # ((0.5,1.0), (1.5,1.8))
+     >>> T[M] *=  A[M]                          # ((0.5,1.0), (3,4), (1.5,1.8), (7,8))
+
+  Oops. Was having problems with setting. Redefined how masks set(). OK now...
+
+     >>> x = Variant((1,2,3))
+     >>> m = Variant((1,0,1)).toMask()
+     >>> y = Variant((4,5,6))
+     >>> x[m] = y                               # (4,2,6) as expected
+
+     >>> x = Variant(((1,2),(3,4)))
+     >>> y = Variant(((5,6),(7,8)))
+     >>> m = Variant((1,0)).toMask()
+     >>> x[m] = y[m]                            # ((5,6),(3,4)) as expected
+     
+     >>> x = Variant(((1,2),(3,4)))
+     >>> y = Variant(((5,6)))                   # (5,6), not ((5,6)) as requested! Pythonic!
+     >>> m = Variant((1,0)).toMask()
+     >>> x[m] = y                               # (5,(3,4)) WRONG! Python's fault ^
+     
+     >>> x = Variant(((1,2),(3,4),(5,6)))
+     >>> y = Variant(((7,8),(9,0)))             # No need to be parallel to x. parallel to x[m]
+     >>> m = Variant((1,0,1)).toMask()
+     >>> x[m] = y                               # ((7,8),(3,4),(9,0))
+
+     >>> x = Variant(((1,2),(3,4),(5,6)))
+     >>> m = Variant((1,0,1)).toMask()
+     >>> y = Variant(((7,8),(-1,-1),(9,0)))
+     >>> x[m] = y[m]                            # now works
+     
+     
+  NOTE: Let's change the definition of how we set with MASK. It should "use-up" just like ARRAY.
+
+  Now, just to be sure it's working. Let's expand the example somewhat,
+
+     >>> T = Variant(((1,2),(3,4),(5,6),(7,8)))      # NxY            N = 4, Y = 2
+     >>> R = Variant(('a','b','a','d'))              # (a,b,a,d)      N array
+     >>> M = R == 'a'                                # (T,F,T,F)      N mask
+     >>> A = Variant(((0.5,0.2,0.3,0.9), (2,3,4,5))) #              2xN array
+     >>> T[M] *= A[0][M]                             # ((0.5,1.0), (3,4), (1.5,1.8), (7,8))
+
+  So, once you have your Offsets mask M, your tpot T, your additionality (with level) A
+  all you've got left is a one-liner: T[M] *= A[i][M] where i is the additionality level (0..4)
+
+     =============================================================================
+  
+  self.preprocessPriceLimits():
+
+    
+10/07/2009 --------------------------------------------------------------------------------------
+
+  Stepping back, I need a way to capture Offsets and Capped Sectors. Here's the idea,
+  
+  * We pass in a STRING_MAP/ARRAY as an *allow* selector into a STRING_MAP. Call this a
+    SELECT_MAP? No need for a new name. Here's some possible code,
+
+    >>> S = Variant({'CA':set(('Cement', 'Forestry')), 'WCI':set()})
+    >>> D = Variant.createStringMap()
+    >>> D['Region'] = ('CA','CA','CA','WCI','WCI','WCI')
+    >>> D['Sector'] = ('Cement','CMM','Forestry','CMM','Forestry', 'Agriculture')
+    >>> D['T'] = outer((1,2,3,4,5,6),(1,2))
+    >>> D[S] ???
+    (T,F,T,T,T,T)
+
+    How can this work? D is an STRING_MAP and S is a STRING_MAP. First of all the selector is
+    incompletely stated. There is no mention of 'Region'. How can 'CA' be related? Let's step 
+    back further and realize we need to state the column to which the select applied. Hierarchy
+    implies "and restrict" while pearage implies "or". Here's another attempt,
+
+    >>> S = Variant({'Region':{'CA':{'Sector':set(('Cement', 'Forestry'))}, 'WCI':set(())}})
+    
+    --or--
+    
+    >>> S = Variant.createStringMap()
+    >>> S['Region'] = Variant.createStringMap()
+    >>> S['Region']['CA']  = {'Sector':set(('Cement', 'Forestry'))}
+    >>> S['Region']['WCI'] = Variant.createStringSet()
+
+    {Region: {WCI: {}, 
+    	      CA : {Sector: {Cement, Forestry}}}}
+
+    We're trying to say with D[S] that we want to refer to the 'Region' column and allow
+    values 'WCI' and 'CA', but for 'CA' we only allow 'Cement' and 'Forestry' to appear
+    from the 'Sector' column. We must assume that 'Region' and 'Sector' are mapped to
+    parallel arrays else the mask(s) we are about to generate won't make sense.
+
+    Actually, we don't say D[S], we say createMask(D,S). That is, a tailored mask for D of S.
+
+    Steps: * create the 'WCI' mask against the 'Region' array. Referring to the above dataset D
+    	     (F,F,F,T,T,T), that is >>> D['Region'] == 'WCI'
+	   * We will 'or' this with all the other region restrictions.
+	     Can we be re-entrant? For 'CA' we then say >>> 
+	     D['Region'] == 'CA'          # (T, T, T, F, F, F)
+	     D['Region'] == 'WCI'         # (F, F, F, T, T, T)
+	     then we look at the children that 'CA' is mapped to. We will pass that child
+	     back in as >>> createMask(D, S['Region']['CA'])
+	   * D['Sector'] == 'Cement'      # (T, F, F, F, F, F)
+	     D['Sector'] == 'Forestry'    # (F, F, T, F, T, F)
+	     That is,
+	     (D['Sector'] == 'Forestry') + (D['Sector'] == 'Cement')   # (T, F, T, F, T, F)
+	     -- or these together since peers  and return --
+	   * CA Region is 'and' constrained so we find,
+	     (D['Region'] == 'CA') * (D['Sector'] == 'Forestry') + (D['Sector'] == 'Cement')
+	     (T, F, T, F, F, F)
+           * This result is 'or'ed with D['Region'] == 'WCI'  
+	     (F, F, F, T, T, T)
+	     with the expected result,
+	     (T, F, T, T, T, T)
+
+  Building the function:
+    >>> D = Variant({'Region':('CA','CA','CA','WCI','WCI','WCI'), 'Sector':\
+    ('Cement','CMM','Forestry','CMM','Forestry', 'Agriculture'), 'T':outer((1,2,3,4,5,6),(1,2))})
+
+    >>> D[{'Sector': set(('Cement', 'Forestry'))}]
+    (T, F, T, F, T, F)
+
+    >>> D[{'Sector': ('Cement', 'Forestry')}]    # This is new as of 10/12/2009
+    (T, F, T, F, T, F)
+
+    >>> D[{'Sector': set(('Cement', 'Forestry')), 'Region':'WCI'}]
+    (T, F, T, T, T, T)
+
+    >>> D[{'Region':set(('WCI',))}]
+    (F, F, F, T, T, T)
+
+    >>> D[{'Region':'WCI'}]
+    (F, F, F, T, T, T)
+
+    >>> D[{'Sector':'CMM'}]
+    (F, T, F, T, F, F)
+
+    >>> D[{'Sector': set(('Cement', 'Bletch')), 'Region':set(('WCI',))}]
+    (T, F, F, T, T, T)
+
+    >>> D[{'Sector': ('Cement', 'Bletch'), 'Region':set(('WCI',))}]   # new as of 10/12/2009
+    (T, F, F, T, T, T)
+
+    >>> D[{'Region':{'WCI':set()}}]
+    (F, F, F, T, T, T)
+
+    >>> D[{'Region':{'WCI':'anything but a map'}}]
+    (F, F, F, T, T, T)
+
+    >>> D[{'Sector':{'CMM':set(), 'Forestry':0}}]
+    (F, T, T, T, T, F)
+    
+    >>> D[{'Region':{'CA':{'Sector':set(('Cement', 'Forestry'))}, 'WCI':0}}]
+    (T, F, T, T, T, T)
+
+  NOTE: Assume that AND and OR of (MASK, Null) return original MASK.
+
+  We need to handle three cases for createMask(D, S),
+
+     createMask(ARRAY, SET)                -- easy to spot. now handled.
+     createMask(MAP, MAP(a:SET, ...))      -- 
+     createMask(MAP, MAP(a:MAP(...), ...)  -- done.
+    
+10/08/2009 --------------------------------------------------------------------------------------
+
+* Here's what needs to happen for the Capped Sectors and Offsets to be processed. 
+  * Find all the sectors in CA to present as cappable.
+    given the available field in what we call "first_table",
+
+      FIRST_FIELDS  = ['Region', 'Sector', 'Subsector', 'Measure', 
+                       'Add_1', 'Add_2', 'Add_3', 'Add_4', 'Add_5']
+
+      But, toSet() doesn't yet exist. Let's build it. It basically calls keys(),
+
+      >>> Variant(1).toSet()
+      >>> Variant("foo").toSet()
+      
+      >>> from DataProcessing import *
+      >>> regions  = first_table['Region'].toSet()           # a STRING_SET
+      >>> ca_mask  = first_table[{'Region':'CA'}]            # a MASK
+      >>> ca_mask2 = first_table['Region'] == 'CA'           # same
+      >>> sectors  = first_table['Sector'][ca_mask].toSet()  # a STRING_SET
+      >>> ca_mask == ca_mask2                                # T
+
+  * OK, that's great, but we need a sorted list. Let's do sorting...
+
+    (5,6) ~?~ (2,3,7,8,9). Clearly LHS > RHS as far as it goes...Not comparable?
+    Let's try some examples. Are we on the right track?
+
+      >>> Variant((5,2,3)).sort()
+      >>> Variant(('Bob', 'Alice', 'Ted', 'Carol')).sort()
+      >>> Variant((1,0,1,0)).sort()
+      >>> Variant(((1,1,1),(0,1,0))).sort()
+
+    In fact, all the comparison operations are now defined through rich compare __cmp__.
+    NOTE: __cmp__ is *not* used for equality! We separately define __eq__.
+    
+      >>> A = Variant((1,1,1))
+      >>> B = Variant((1,2,1))
+      >>> A < B                 # true
+      >>> A <= B                # true
+      >>> A > B                 # false
+      >>> A == B                # (T, F, T)     <--- this is a critical difference! Array compare
+
+    Finally we can deal with sorted unique arrays,
+
+      >>> from DataProcessing import *
+      >>> regions  = first_table['Region'].toSet().sort()        # an ARRAY of strings.
+      (CA, International, Rest of USA, WCI)
+    
+    NOTE: Arrays are NOT sorted in-place. All others return a new ARRAY.
+    
+    Later, (11/19/2009) introduced isort().
+      >>> A = Variant((4,5,3,2))
+      >>> B = A.sort()              # [2,3,4,5]
+      >>> i = A.isort()             # [3,2,0,1]
+      >>> A[i]                      # [2,3,4,5]
+      >>> A[A.isort()] == A.sort()  # (T,T,T,T) just to show off a bit.
+  
+10/09/2009 --------------------------------------------------------------------------------------
+
+  self.preprocessPriceLimits():
+
+  * Double.POSITIVE_INFINITY  -- we'll support this with a new function to create it.
+  * Double.NaN
+
+    >>> x = Variant((1,2,3))
+    >>> x.setInfinite()
+    (Infinity, Infinity, Infinity)
+    >>> -x
+    (-Infinity, -Infinity, -Infinity)
+
+  * If there's a price ceiling we'll create a new item called "Carbon Tax" at cost "$c" 
+    and infinite quantity.
+  
+    Assume cpt, tpot are NxY arrays. We need to create a main data structure that holds 
+    cpt, tpot, and ('Region', 'Sector', 'Subsector', 'Measure').
+
+    let's look back at stack(). We also need to know how to add arrays of strings. No append.
+
+      >>> A = Variant(("foo", "bar"))
+      >>> B = Variant(("zaz", "car"))
+      >>> A.append(B)                       # A is altered.
+      (foo, bar, zaz, car)
+      >>> A = Variant(("foo", "bar"))
+      >>> A + B                             # A,B unaltered.
+      (foozaz, barcar)
+ 
+    We need to revisit stacking. It's not well constructed. Here's the beginning...
+
+      >>> D1 = Variant({'first': arange(7),   'second':-arange(5),   'third':'ignore'})
+      >>> D2 = Variant({'first': arange(7)*2, 'second':-arange(5)*3, 'other':'also ignore'})
+      >>> D  = Variant((D1, D2))
+      >>> D1[('first', 'second')]
+      ((0, 1, 2, 3, 4, 5, 6), (0, -1, -2, -3, -4))
+      >>> D1[set(('first', 'second'))]
+      {first: (0, 1, 2, 3, 4, 5, 6), second: (0, -1, -2, -3, -4)}
+      >>> D[set(('first', 'second'))]
+      ({first: (0, 1, 2, 3, 4, 5,  6),  second: (0, -1, -2, -3, -4)}, 
+       {first: (0, 2, 4, 6, 8, 10, 12), second: (0, -3, -6, -9, -12)})
+
+    static Variant::stack(ARRAY)
+
+      We fundamentally have two passes in order to allocate the space for our the internal arrays
+      This looks like it's getting hairy and I've not even started. Pass in an array. So what?
+      We want to turn this array into a single data type, that is, we're assuming that the
+      internal elements all look somehow like the first element. The prototype.
+
+      Another approach. Suppose make stack a member function. If we apply it to an array then
+      we need to find out what kind of array this is. If it's an array of INTs or DOUBLEs for 
+      example...then we're just saying toArray(). If this is an array of STRING_MAPs then
+      we must mean to stack the contents across items. So if we have a key 'key1' in the first
+      STRING_MAP then we look for it in all other STRING_MAPs and form a 2D array, then stack it.
+      Is there a way to mix ARRAY into one of the elements? How about we say, for each
+      element we say toArray() and that's it.
+
+        >>> D1 = Variant({'first': arange(7),   'second':-arange(5),   'third':'ignore'})
+        >>> D2 = Variant({'first': arange(7)*2, 'second':-arange(5)*3, 'other':'also ignore'})
+        >>> D  = Variant((D1, D2))
+        >>> E = D[set(('first', 'second'))]
+        ({first: (0, 1, 2, 3, 4, 5,  6),  second: (0, -1, -2, -3, -4)}, 
+         {first: (0, 2, 4, 6, 8, 10, 12), second: (0, -3, -6, -9, -12)})
+	>>> E.stack()
+       {first:  (0,  1,  2,  3,  4, 5,  6,  0,  2,  4, 6, 8, 10, 12), 
+        second: (0, -1, -2, -3, -4, 0, -3, -6, -9, -12)}
+	>>> D  = Variant((D1, D2, ('a', 'b'), D1))
+	>>> D[set(('first', 'second'))].stack()
+
+      One more turn of the crank. We base .stack on the first element is prototype model.
+
+        >>> D1 = Variant({'first': arange(7),   'second':-arange(5),   'third':'ignore'})
+        >>> D2 = Variant({'first': arange(7)*2, 'second':-arange(5)*3, 'other':'also ignore'})
+	>>> Variant((D1, D2, ('a', 'b'), D1)).stack()
+	{first: (0, 1, 2, 3, 4, 5, 6, 0, 2, 4, 6, 8, 10, 12, a, b, 0, 1, 2, 3, 4, 5, 6), 
+	second: (0, -1, -2, -3, -4, 0, -3, -6, -9, -12, a, b, 0, -1, -2, -3, -4),
+	third: (ignore, a, b, ignore)}
+
+     A more pedestrian example is then,
+
+	>>> Variant((D1, D2, D1))[set(('first', 'second'))].stack()
+	{first: (0, 1, 2, 3, 4, 5, 6, 0, 2, 4, 6, 8, 10, 12, 0, 1, 2, 3, 4, 5, 6), 
+	second: (0, -1, -2, -3, -4, 0, -3, -6, -9, -12, 0, -1, -2, -3, -4)}
+
+     And something more utilitarian. Basically this a is flatten-like function,
+
+       >>> Variant((arange(3), -arange(2)*4, ('a','b','c'))).stack()
+       (0, 1, 2, 0, -4, a, b, c)
+
+       >>> Variant((arange(3), (7,4,2)))
+       ((0, 1, 2), (7, 4, 2))
+       >>> Variant((arange(3), (7,4,2))).stack()
+       (0, 1, 2, 7, 4, 2)
+       >>> Variant((arange(3), (7,4,2), outer(arange(3),-arange(4))))
+       ((0, 1, 2), (7, 4, 2), ((0, 0, 0, 0), (0, -1, -2, -3), (0, -2, -4, -6)))
+       >>> Variant((arange(3), (7,4,2), outer(arange(3),-arange(4)))).stack()
+       (0, 1, 2, 7, 4, 2, (0, 0, 0, 0), (0, -1, -2, -3), (0, -2, -4, -6))
+       >>> Variant((arange(3), (7,4,2), outer(arange(3),-arange(4)))).stack().stack()
+       (0, 1, 2, 7, 4, 2, 0, 0, 0, 0, 0, -1, -2, -3, 0, -2, -4, -6)
+
+     Finally, we return to where we started. Given an ARRAY of STRING_MAPs we can stack as,
+
+       >>> ID_FIELDS   = ['Region', 'Sector', 'Subsector', 'Measure']
+       >>> ADD_FIELDS  = ['Add_1', 'Add_2', 'Add_3', 'Add_4', 'Add_5']
+       >>> ...create a list of first_tables from data processing modules...
+       >>> first_table = stack2(first_tables, ID_FIELDS + ADD_FIELDS)
+       >>> table    = first_table[set(ID_FIELDS)]        # each an N array
+       >>> table['Additionality'] = ADDITIONALITY        # a 5xN array
+       >>> table['CPT']  = CPT                           # NxY array
+       >>> table['TPOT'] = TPOT                          # NxY array
+
+    We can then easily show all the available CA sectors,
+
+       >>> table['Sector'][table[{'Region':'CA'}]].toSet().sort()
+       (Agriculture, Cement, Chemical, Coal Mine Methane, Electric, Forestry, High GWP, 
+        LCFS, Landfill, Manure Management, Oil & Gas - Fugitive)
+
+  NOTE: Changed name of DataProcessing.py to Dataset.py
+
+   Now we begin ModelPrep.py ================================
+
+     >>> offset_mask  = dataset[config['Eligible Offsets Query']]
+     >>> dataset['Sector'][offset_mask].toSet().sort()
+     (Agriculture, High GWP, Landfill, Manure Management, Oil & Gas - Fugitive)
+     
+   It's to the offsets that the additionality applies. Here's how,
+   
+     >>> dataset['tpot'][offset_mask] *= dataset['additionality'][level-1][offset_mask]
+       
+   Before we get too carried away, we need to exclude "malformed" data (NaN and Inf).
+
+     >>> valid_mask = dataset['tpot'].validityMask() * dataset['cpt'].validityMask()
+     --- better yet---
+     >>> valid_mask = dataset[set(('tpot', 'cpt'))].validityMask()
+    
+     >>> WORK_SET = set(('Region', 'Sector', 'Subsector', 'Measure','tpot', 'cpt'))
+     >>> workset  = dataset[WORK_SET][valid_mask]
+
+   Now we can do checksums!
+
+     >>> workset['cpt'].sum().sum()         # 224497.5191552254
+     >>> workset['tpot'].sum().sum()        # 1.7671082973078564E11
+ 
+  self.preprocessPriceLimits():
+
+    We need to create a PriceCeiling workset that may be empty. Can we do this easily?
+
+      >>> x = Variant({'a':(1,2,3), 'b':(4,5,6), 'c':(7,8,9)})
+      >>> m = Variant((0,0,0)).toMask()
+      >>> x[m]                          # {a:(), b:(), c:()} as required.
+
+      >>> x[0]                          # {a:1, b:4, c:7}     correct, but undesired here.
+      >>> x[:1]                         # {a:(1),b:(4),c:(7)} that is it.
+
+    Now make sure 2D arrays are respected. Notice the (2 level) shallowness of the copy.
+
+      >>> x = Variant({'a':outer(arange(3), arange(2)*2), 'b':(7,8,9)})
+      >>> y = x[:1]
+      >>> y['a'][0][0] = 'foo'
+      >>> y                             # {a: ((foo, 0)),                 b: (7)}
+      >>> x                             # {a: ((foo, 0), (0, 2), (0, 4)), b: (7, 8, 9)}
+      >>> y = x[:1].copy()
+      >>> y['a'][0][0] = 'GOOP'         # x unaltered as required.
+      >>> y = x[:0].copy()              # This copy ALL of x, not NONE.
+
+   
+10/12/2009 --------------------------------------------------------------------------------------
+
+  Let's wrap up the model pre-processing...
+
+  First, about that query...can we make lists equivalent to sets, please? Done.
+
+    >>> D = Variant({'Region':('CA','CA','CA','WCI','WCI','WCI'), 'Sector':\
+    ('Cement','CMM','Forestry','CMM','Forestry', 'Agriculture'), 'T':outer((1,2,3,4,5,6),(1,2))})
+
+    >>> D[{'Sector': set(('Cement', 'Forestry'))}]
+    (T, F, T, F, T, F)
+    >>> D[{'Sector': ('Cement', 'Forestry')}]
+    (T, F, T, F, T, F)
+
+  Next, we need to ensure that MASK +/-/* are set operations.
+
+    >>> A = createMask((1,0,1,0))  # (T,F,T,F)
+    >>> B = createMask((1,1,0,0))  # (T,T,F,F)
+    >>> A + B                      # (T,T,T,F)
+    >>> A - B                      # (F,F,T,F)  # fixed today.
+    >>> A * B                      # (T,F,F,F)
+
+  NOTE: Found an unexplained discrepancy in "tpot" total sum today,
+  
+    was 1.7671082973078564E11
+    now 1.766098405569946E11
+
+  TODO: It's getting serious, need to look into building a test suite soon.
+
+  self.preprocessPriceLimits():
+
+    The trick is to enforce a minimum price across the board. Here's how it could work,
+    
+      >>> A = Variant(((1,2,3), (2,3,4),(3,4,5),(4,5,6)))
+      >>> Max(A, 3)                                        # *not* min() lowercase
+      ((3, 3, 3), (3, 3, 4), (3, 4, 5), (4, 5, 6))
+
+    We need to make sure that MASK[MASK] is a MASK
+
+      >>> A = createMask((1,0,1,1))
+      >>> B = createMask((1,1,1,0))
+      >>> A[B]                           # (T,F,T)
+      >>> A[B] = (0,1,0)                 # A = (F,T,F,T)
+
+    We would like to have .max() and .min() while we're developing this stuff,
+
+      >>> A = Variant((1,4,3))
+      >>> A.max()                                      # Variant(4)
+      >>> Variant((1,4.2,3)).max()                     # Variant(4.2)
+      >>> Variant(((1,2,3), (2,5,4), (7,2,3))).max()   # (3,5,7)
+      >>> Variant(((1,2,3), (2,5,4), (7,2,3))).min()   # (1,2,2)
+
+    Then we have,
+
+      >>> cpt[mask] = Max(cpt[mask], price_floor)
+
+    The other tool we need is for cmp to behave polymorphically rather than as (-1,0,1),
+    
+      >>> Variant((1,4,2)) < 3                            # (T,F,F)
+      >>> Variant(((1,2,3), (2,3,4), (1,2,3,4,5))) <= 3   # ((T,T,T), (T,T,F), (T,T,T,F,F))
+
+    So that we can write,
+
+      >>> price_floor = 2;
+      >>> workset['cpt'][work_cap_trade_mask] < price_floor        # ARRAY.MASK
+      >>> workset['cpt'][work_cap_trade_mask].min() < price_floor  # MASK
+
+   Consider using cmpUpgradeToMask() more widely.
+ 
+      >>> A = Variant(((1,2,3),(2,3,4),(1,2,3,4,5))) # ((1,2,3), (2,3,4), (1,2,3,4,5))
+      >>> M = A < 3                                  # ((T,T,F), (T,F,F), (T,T,F,F,F))
+      >>> A[M]                                       # ((1,2),   (2),     (1,2))
+      >>> A[M] = 'x'                                 # ((x,x,3), (x,3,4), (x,x,3,4,5))
+
+10/13/2009 --------------------------------------------------------------------------------------
+   
+  Getting started with JUnit testing. Here's some starter code,
+
+    import junit.framework.*;
+    
+    public class TestVariant extends TestCase {
+
+      public void testAdd() {
+        Variant num1  = new Variant(3);
+        Variant num2  = new Varinat(2);
+        Variant total = new Variant(5);
+        Variant sum   = Variant.add(num1, num2);
+        assertEquals(sum, total);  // ???
+      }
+    } 
+
+  NOTE: Need to install: junit (3.8.2-1ubuntu2)
+
+  Using a build.xml file constructed for junit.
+
+  Added "build.xml" to project.
+
+  Need to write a .equals() method for Variant. Done.
+
+  Now that we've moved stuff around we need to be able to run the legacy tests.
+  
+    %> ant dist
+    %> ant [test]
+    %> ant clean
+
+  NOTE: Let's add dist/PHoX.jar to the CLASSPATH
+
+  Now, want to be able to set through a stack of masks. Let's build a test case...(Python first)
+
+    >>> A = Variant({"foo": outer((1,2,3),(0,10,20)), "bar":(3,4,5)})
+    >>> M = A['bar'] > 3                                   # (F,T,T)
+    >>> N = createMask((1,0))                              # (T,F)
+    >>> A['foo'][M][N]                                     # ((0,20,40)) 1x3 array
+    >>> A['foo'][M][N] = [['this', 'is', 'new']]           # Correct
+    >>> B = A['foo']                                       # ((0,10,20), (0,20,40),  (0,30,60))
+    >>> B[M][N] = [['Why', 'Not', 'Me']]                   # ((0,10,20),(Why,Not,Me),(0,30,60))
+    >>> C = A['foo'][M]                                    # ((Why,Not,Me), (0,30,60))
+    >>> C[N] = [['fee', 'fie', 'foe']]                     # ((fee,fie,foe), (0,30,60)) OK!
+    >>> B                                                  # ((0,10,20),(fee,fie,foe),(0,30,60))
+    
+  simpler,
+  
+    >>> B = outer((1,2,3),(0,10,20))
+    >>> M = createMask((0,1,1))
+    >>> N = createMask((1,0))
+    >>> C = B[M]                                           # 
+    >>> B[M][N][0][1] = 'a'                                # ((0,10,20), (0, a,40), (0,30,60))
+    >>> C                                                  #            ((0, a,40), (0,30,60))
+    >>> C[N] = [['x', 'y', 'z']]                           #            ((x, y, z), (0,30,60))
+    >>> B                                                  # ((0,10,20), (x, y, z), (0,30,60))
+    >>> B[M][N] = [['A', 'B', 'C']]                        # ((0,10,20), (A, B, C), (0,30,60))
+    >>> C                                                  #            ((A, B, C), (0,30,60))
+ 
+  NOTE: use: X.hashCode() in java/python to get unique id of any object.
+
+  Have pretty much finished ModelPrep/DataManager2 replication.
+  Am not doing Mandatory and will not do Price Triggers yet. They need work!
+
+  Next up is the ModelEngine itself. This will involve updating the ModelPrep since it's
+  job is to feed the ModelEngine. This will be done in-process rather than gathering everything
+  to a point then going through a loading phase. We'll just load as we go. How does this work?
+
+  About the only thing I know off the bat is that I'll need sparse matrices. These have a lot
+  of interesting routines that basically are creation and stacking utilities.
+  There is one occasion where we need to multiply a vector and an (sparse) matrix.
+
+  The curious part will come in the inevitable redesign of the model engine. It's way too complex
+  What different kinds of objects are we handing the LP engine? We stack things this way
+  and that to what effect? If we can apprehend the basic operations then we can build
+  the engine into Java. I think this is a case where we'll finally need a class beyond Variant.
+
+10/14/2009 --------------------------------------------------------------------------------------
+
+  Decide: roll-own sparse matrix or MTJ-backed. Need matrix*vector multiply.
+  It seems that MTJ doesn't have the flexibility we may want for manipulating sparse matrices.
+  We need to be able to set and extend rows and columns as we append matricies. SPMATRIX.
+  We want to be able to multiply SPMATRIX my an array which means dynamically creating an MTJ
+  vector. We man just go ahead and create an MTJ matrix on the fly as well, do the multiply
+  and then restore the result (an MTJ matrix into an ARRAY). It's a performance hit,
+  then it's not a common operation and it is sparse afterall.
+
+  Before doing the careful review of our previous code we can muse about the forms we need.
+
+  We need to create SPMATRIX based on various descriptions.
+  We need to stack horizontally and vertically. This implies dynamic arrays so avoid copying.
+
+  Here's what we utilities developed late last year,
+
+    >>> r = rows[mask]
+    >>> c = cols[mask]
+    >>> v = ones(r.size)
+    >>> return (v, r, c, (Y,Y))
+
+    >>> v,r,c,s = A   # unpacks the variables from the structure A.
+
+  The various operations we support,
+
+    def getSparseBandedTriDescription(Y, b):
+    def getSparseTriBandedTriDescription(Y, b):
+    def getMaskedReplication(v, r, c, Y, mask, bRowwise):
+    def getSparseIdentityDescription(Y, N, Polarity = POSITIVE):
+    def getSparseDiagonalDescription(Y, mask, Polarity = POSITIVE):
+    def getSparseHorizBandedTriDescription(Y, b, mask, Polarity = POSITIVE):
+    def getSparseHorizTriBandedTriDescription(Y, b, mask, Polarity = POSITIVE):
+    def getSparseDiagonalBandedTriDescription(Y, b, mask, Polarity = POSITIVE):
+    def concatenateSparseDescriptions(A, B):
+    def concatenateMultipleSparseDescriptions(As):
+    def verticallyStackDescriptions(A, B):
+    def verticallyStackMultipleDescriptions(As):
+    def getSparseMatrixFromDescription(A):
+    def multiplySparseMatrixAndArray(A, x):
+    def mytranspose(arr):
+    def runGLPK(p,A,b):    # price, A matrix, b vector
+
+  Let's play with ModelEngineUtilities.py
+
+    >>> from ModelEngineUtilities import *
+    >>> A = getSparseBandedTriDescription(5, 2)  # 2 subdiagonals
+    (array([1,1,1,1,1,1,1,1,1]), 
+     array([0,1,2,3,4,1,2,3,4]), 
+     array([0,1,2,3,4,0,1,2,3]), (5,5))
+
+  It would be nice to print this as,
+
+      1
+      11
+       11
+        11
+         11
+
+    >>> getSparseTriBandedTriDescription(5,3)   # maxes out at 3
+    (array([1,1,1,1,1,2,2,2,2,3,3,3,3,3,3]), 
+     array([0,1,2,3,4,1,2,3,4,2,3,4,3,4,4]),
+     array([0,1,2,3,4,0,1,2,3,0,1,2,0,1,0]),(5,5))
+
+      1
+      21
+      321
+      3321
+      33321
+
+    >>> # getSparseDiagonalDescription(Y, mask, Polarity = POSITIVE):
+    >>> Y = 5
+    >>> mask = array([ True, False,  True], dtype=bool)  # N = 3
+    >>> v = ones(Y)
+    >>> r = arange(Y)
+    >>> getMaskedReplication(v, r, r, Y, mask, True)
+    (array([1,1,1,1,1, 1, 1, 1, 1, 1]), 
+     array([0,1,2,3,4,10,11,12,13,14]), 
+     array([0,1,2,3,4,10,11,12,13,14]), (15, 15))        # YNxYN
+
+
+    >>> getSparseIdentityDescription(2,3)  # diagonal 6x6
+    (array([1,1,1,1,1,1]), 
+     array([0,1,2,3,4,5]), 
+     array([0,1,2,3,4,5]), (6, 6))
+
+    >>> getSparseHorizBandedTriDescription(5, 2, array((1,0,1), dtype=bool))
+    (array([1,1,1,1,1,1,1,1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1]), 
+     array([0,1,2,3,4,1,2,3,4, 0, 1, 2, 3, 4, 1, 2, 3, 4]), 
+     array([0,1,2,3,4,0,1,2,3,10,11,12,13,14,10,11,12,13]), (5, 15))
+
+     1    .    1
+     11    .   11
+      11    .   11
+       11    .   11
+        11    .   11
+
+    >>> getSparseHorizTriBandedTriDescription(5, 3, array((1,0,1),dtype=bool))
+    (array([1,1,1,1,1,2,2,2,2,3,3,3,3,3,3, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3]), 
+     array([0,1,2,3,4,1,2,3,4,2,3,4,3,4,4, 0, 1, 2, 3, 4, 1, 2, 3, 4, 2, 3, 4, 3, 4, 4]), 
+     array([0,1,2,3,4,0,1,2,3,0,1,2,0,1,0,10,11,12,13,14,10,11,12,13,10,11,12,10,11,10]),(5,15))
+
+     1    .    1
+     21    .   21
+     321    .  321
+     3321    . 3321
+     33321    .33321
+
+    >>> getSparseDiagonalBandedTriDescription(3, 2, array((1,0,1),dtype=bool))
+    (array([ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]), 
+     array([ 0, 1, 2, 1, 2, 6, 7, 8, 7, 8]), 
+     array([ 0, 1, 2, 0, 1, 6, 7, 8, 6, 7]), (9, 9))
+
+     1
+     11
+      11
+        .
+         .
+          .
+           1
+           11
+            11
+
+  What we need to do now is to decide on a convenient representation. We have a collection of
+  triples: (VALUE, ROW_INDEX, COL_INDEX) and a pair (NUM_ROWS, NUM_COLS). We can certainly
+  create the triple of (Double[], Integer[], Integer[]) and perhaps a 4th as in
+  (Double[], Integer[], Integer[], Integer[]) where the last one is understood to contain
+  the rows/columns pair. Now we don't have a convenient typed array other than Variant[].
+  What we could do is create an internal structure and pass all the operations to it. We
+  could even do an external structure below the Variant. Again, using the Variant as needed
+  to subcontract. Do we really need to build this new object into the Variant? We do if we
+  want it to mix with Variants. Let's build it separately for now and build it into the Variant
+  later.
+
+  Keep in mind that we may use the Variant as an OEM. This means that we can't have some
+  rich set of creation functions. There needs to be one or two creation functions with
+  a rich set of parameters or at least very descriptive ones. We could require a map
+  HashMap<String, Variant>, but then we would violate the separation. Oh no! we're being sucked 
+  back into the Variant blob! How many ways are there to describe a SPMATRIX?
+
+  Having examined the sparse description zoo there are some patterns that emerge. The first is
+  within a block we are: diagonal, unit-tri, unit-tri-tri
+  layered on top of the block description we have the limit in bandedness and value.
+
+  * diagonal (with polarity)
+  * tridiagonal (banded, with polarity)             -- tri(b)
+  * tritridiagonal (banded b1, banded b2, polarity) -- is tri(b1) * tri(b2)
+
+  Then we lay out the blocks either horizontally or diagonally.
+  Clearly we can stack blocks together vertically as well. Once we have the block concept
+  we're free to assemble blocks in any of the ways we can figure,
+
+  * horizontal
+  * diagonal
+  * vertical
+  * sparsely -- this is the superset of the above where we state where the block should be placed
+
+  OK. Let's do the sparse matrix inside the Variant as follows (row-major),
+
+    int   []   R = new int   [num_rows];   // Index into sparse row array
+    int   [][] C = new int   [num_rows][]; // Will allocate the actual column indecies later
+    Double[][] D = new Double[num_rows][]; // Parallel array to cols. 
+
+  When we want to multiply by a VECTOR (Double[]) we're presuming the following structure,
+
+    R0 : C00 C01 C02 C03      | V0  with parallel array D =  D00 D01 D02 D03
+    R1 : C10                  | V1                           D10
+    R2 : C20 C21 C22 C23 C24  | V2                           D20 D21 D22 D23 D24
+    R3 : C30 C31              | V3                           D30 D31
+                              | V4
+                              | V5
+
+  where the (Ri,Cij) entry in the "C" array is a sparse index pair. To multiply the first row
+  we essentially grab the R0 columnset (C00, C01, C02, C03) == C0 of indecies and say to the 
+  vector, V[C] which creates a subvector of (in this case 4) elements V' = (V'0, V'1, V'2, V'3)
+  Since D is parallel to C. Notice that by design R need only be a 1D array.
+  Then the result of A ( the sparse matrix) times the vector V is the vector U,
+
+    Ui = Sum{k=0..Ki} V[Cik] * Dik   // recipe for U = A * V
+
+  How do we begin our SPMATRIX? When it's constructed we need to allocate it right away.
+  This means that we need to know and construct it's non-zero form.  We don't need to know
+  it's contents, but only which values are to be non-zero. Diagonal with sub-band or super-band.
+  lower triangular is just a special case. Suppose this was all we knew? Yuck.
+  The alternative is to insist on final form immediately. How do we indicate this?
+  * rows, cols, FLAVOR? No...
+  * rows, cols, sideband, limit, 
+
+  Here's the initial pass,
+
+    >>> A = Variant.createSparseMatrix(4,4,2)
+    >>> X = Variant.createVector((2,3,5,7))
+    >>> A * X
+    [2.0, 5.0, 10.0, 15.0]                     # correct.
+    >>> A
+    1.0
+    1.0 1.0
+    1.0 1.0 1.0
+        1.0 1.0 1.0
+
+  Slightly more interesting...
+
+    >>> A = Variant.createSparseMatrix(100,100,100)
+    >>> X = Variant.createVector(arange(100)+1)
+    >>> A*X
+    [1.0, 3.0, 6.0, 10.0, 15.0, 21.0, 28.0, 36.0, 45.0, 55.0, 66.0, 78.0, 91.0, 105.0, 120.0, 
+    136.0, 153.0, 171.0,190.0, 210.0, 231.0, 253.0, 276.0, 300.0, 325.0, 351.0, 378.0, 406.0, 
+    435.0, 465.0, 496.0, 528.0, 561.0, 595.0, 630.0, 666.0, 703.0, 741.0, 780.0, 820.0, 861.0, 
+    903.0, 946.0, 990.0, 1035.0, 1081.0, 1128.0, 1176.0, 1225.0,1275.0, 1326.0, 1378.0, 1431.0, 
+    1485.0, 1540.0, 1596.0, 1653.0, 1711.0, 1770.0, 1830.0, 1891.0, 1953.0, 2016.0, 2080.0, 
+    2145.0, 2211.0, 2278.0, 2346.0, 2415.0, 2485.0, 2556.0, 2628.0, 2701.0, 2775.0, 2850.0, 
+    2926.0, 3003.0, 3081.0, 3160.0, 3240.0, 3321.0, 3403.0, 3486.0, 3570.0, 3655.0, 3741.0, 
+    3828.0, 3916.0, 4005.0, 4095.0, 4186.0, 4278.0, 4371.0, 4465.0, 4560.0, 4656.0, 4753.0, 
+    4851.0, 4950.0, 5050.0]
+
+  that is: n*(n+1)/2 for n = 1..100
+
+    >>> n = arange(100)+1
+    >>> n * (n+1) / 2
+    <same as above>
+
+  and a stress test,
+
+    >>> A = Variant.createSparseMatrix(100000, 100000, 10)
+    >>> X = Variant.createVector(arange(100000)+1)
+    >>> U = A*X                                          # [...1099934.0, 1099945.0] in 1 second.
+
+  the real challenge comes in multiplying two sparse matrices...how the hell do we do that!?
+
+  The issue is that we may not have any match-ups or very few. That's just fine. However
+  many elements there are in the left sparse matrix (it's size by the way...) 
+  there will be no more hits than that from the corresponding right matrix.
+
+  This suggests a quick hash table, say, HashMap<Integer, ...>. Perhaps we need to do this
+  on two levels. We hash the rows HashSet<Integer> for all the row values. Now we can
+  quickly tell if a given row exists in the right matrix. Then for each row we create a
+  HashMap<Integer, Integer> so we can quickly tell (1) if a given column in that row exists
+  and (2) which is the corresponding index into the D array...say..maybe we need to do this
+  by columns...not ready yet.
+
+  Alternatively we transform the matrix into column-major storage. This is more appropriate for
+  matrix multiplication. We might even hint which format we prefer on create...this has promise.
+
+10/15/2009 --------------------------------------------------------------------------------------
+
+  Let's explore alternative sparse matrix representations. The one I have in mind is the
+  diagonal compressed matrix. The basic constructor I have is unit diagonal banded. This
+  seems to be the most fundamental for LP (and DiffEq's also). Rarely is a matrix anti-diagonal
+  and this it's diagonal projection is often sparse where the horizontal and vertical projections
+  tend to each be dense. Basically our systems tend to have a certain structure we can exploit.
+
+  Here's a possible representation,
+
+    HashMap<Integer, HashMap<Integer, Double>> m_data;
+
+  Notice that we are compression neutral at this point, but allow for dual compression, that is,
+  we allow our system to be sparse in each compression direction.
+
+  Suppose we have the following systems,
+
+        a . . .        h . . .        s
+        e b . .        m i . .        t
+    A = . f c .    B = q n j .    V = u == [s, t, u, v]
+        . . g d        . r p k        v
+
+  To represent this system we would have the following m_data's,
+
+    A = {0:{0:a, 1:b, 2:c, 3:d}, 1:{0:e, 1:f, 2:g}}
+    B = {0:{0:h, 1:i, 2:j, 3:k}, 1:{0:m, 1:n, 2:p}, 2:{0:q, 1:r}}
+    V = [s, t, u, v]
+
+  Generally we say,
+
+    A = (A00=a, A01=b, A02=c, A03=d, A10=e, A11=f, A12=g)
+    B = (B00=h, B01=i, B02=j, B03=k, B10=m, B11=n, B12=p, B20=q, B21=r)
+    V = (V0=s, V1=t, V2=u, V3=v)
+  
+  How do we multiply A*V? How do we multiply A*B?
+
+  First the answer to A*V,
+
+    A*V = [a*s, e*s+b*t, f*t+c*u, g*u+d*v]
+
+    Now, how we do it,
+
+    Notice we do proceed down the diagonal as we multiply. 
+    Let i represent the diagonal index (allow this to be negative later)
+    Let j represent the index along (within) the diagonal.
+    What if we striped our computation? Be know A*V will be [x, x, x, x]
+    to we allocate this result. Then we walk each diagonal and locate it's
+    corresponding V-value by index computation.
+
+    Say X = A*V where X = [X0, X1, X2, X3]
+
+    Suppose we take the Aij element. Notice the j index is also the column index,
+
+      Xi+j += Aij * Vj   <<< This how to multiply SPMATRIX, VECTOR (IF i > 0)
+
+    Actually, what we find is,
+
+      Xr += Aij + Vc      where   r = getRow(i,j) and c = getCol(i,j)  <<<< This is it.
+
+      private static int getRow(int i, int j) { return i < 0 ? j : j+i; }
+      private static int getCol(int i, int j) { return i > 0 ? j : j-i; }
+
+    
+  Now we try to multiply SPMATRIX, SPMATRIX,
+
+    Let's try it by hand first,
+
+    X = A*B = ah     .      .      .      where   A = a . . .    B = h . . .
+              eh+bm  bi     .      .                  e b . .        m i . .
+              fm+cq  fi+cn  cj     .                  . f c .        q n j .
+              gq     gn+dr  gj+dp  dk                 . . g d        . r p k
+
+    We're creating an SPMATRIX so we can't pre-allocate a zero result and then accumulate,
+    However, we can create a function add(i, j, value) which will automatically allocate the
+    value at the appropriate diagonal location or add-in the given value.
+
+    The question is: who dominates? Each? Notice that A0 * B0 form X0 (diagonals). So..
+    We take each diagonal of A and multiply by each diagonal of B and accumulate the
+    results into the appropriate diagonal of X. This is so cool!
+
+    Here's how to multiply square matrices A and B with Aij-style indicies.
+
+      1 1 1   1 1 1   A00B00+A-10B10+A-20B20  A00B-10+A-10B01+A-20B11  A00B-20+A-10B-11+A-20B02
+      1 1 1 * 1 1 1 = A10B00+A.01B10+A-11B20  A10B-10+A.01B01+A-11B11  A10B-20+A.01B-11+A-11B02
+      1 1 1   1 1 1   A20B00+A.11B10+A.02B20  A20B-10+A.11B01+A.02B11  A20B-20+A.11B-11+A.02B02
+
+    Let's walk the diagonals for the result C = A*B,
+
+      C0+=[A-20B20, .       , .      ]  C1+=[A-11B.20, .      ]  C-1+=[A.00B-10, .       ]
+      C0+=[A-10B10, A-11B.11, .      ]  C1+=[A.01B.10, .      ]  C-1+=[A-20B.11, .       ]
+      C0+=[A.00B00, A.01B.01, A02B.02]  C1+=[A.10B.00, A11B.01]  C-1+=[A-10B.01, A-11B.02]
+      C0+=[.      , A.10B-10, A11B-11]  C1+=[.       , A20B-10]  C-1+=[.       , A.01B-11]
+      C0+=[.      , .       , A20B-20]  C1+=[.       , A02B.11]  C-1+=[.       , A.10B-20]
+
+      C-2+=[A.00B-20]  C2+=[A20B00]
+      C-2+=[A-10B-11]  C2+=[A11B10]
+      C-2+=[A-20B.02]  C2+=[A02B20]
+
+    The following is the key to the whole business,
+
+      A.00 appears with B00, B-10, B-20 resulting in C.00, C-10, C-20
+      A-10 appears with B10, B.01, B-11 resulting in C.00, C-10, C-20
+      A-20 appears with B20, B.11, B.02 resulting in C.00, C-10, C-20
+
+      A.10 appears with B00, B-10, B-20 resulting in C.10, C.01, C-11
+      A.01 appears with B10, B.01, B-11 resulting in C.10, C.01, C-11
+      A-11 appears with B20, B.11, B.02 resulting in C.10, C.01, C-11
+
+      A.20 appears with B00, B-10, B-20 resulting in C.20, C.11, C.02
+      A.11 appears with B10, B.01, B-11 resulting in C.20, C.11, C.02
+      A.02 appears with B20, B.11, B.02 resulting in C.20, C.11, C.02
+
+    Notice for A0, Bmn -> Cmn
+           for A1, Bmn -> ???
+	   for A2, 
+    If we start with A2 we see that if can only be mixed with B0, B-1, B-2 since B1+A2 =>C3=>BAD
+    Ai,Bm => Ci+m as we've seen before (and below).
+    Since 2>=0 then A20 can only mix with Bm0 for m = 0,-1,-2 (as before). 
+    This suggests we scan what's available and quickly reject the out-of-bounds.
+    Since 2>=0 the -m dictates the Idx in the C result.
+    
+    Next A1. This can mix with B1, B0, B-1, B-2, B-3 (if it existed) since 1+1 <=2 and 1-3>=-2.
+
+    At the diagonal level we have the mechanics,
+
+      Xi+i' = Ai * Bi'
+
+    Now, within the diagonal...suppose given Ai, Bi'. The question is how to match up each
+    diagonal element of Ai with those of Bi'. Column of A must match row of B. The column of
+    element Aij is j and the row of Bi'j' is i'+j'. That is, 
+    
+      j = i'+j' 
+
+    so that (since we know i,j, and i',
+
+      j' = j - i'
+
+    Notice that we can take advantage of the fact that within-diagonal indices are non-negative.
+
+    Look, if you know the ...
+
+  Getting closer, let's test out the new SparseMatrix,
+
+    >>> A = Variant.createSparseMatrix(4,4,2)
+    >>> X = Variant.createVector((2,3,5,7))
+    >>> A * X
+    [2.0, 5.0, 10.0, 15.0]                     # correct.
+    >>> A = Variant.createSparseMatrix(4,4,-2)
+    >>> A * X
+    [10.0, 15.0, 12.0, 7.0]                    # correct.
+
+  Now that we have the experience of multiplying SPMATRIX and VECTOR let's revisit
+  SPMATRIX * SPMATRIX.
+
+  Again the top-level operation is to multiply the A.i diagonal by the B.i diagonal in
+  every valid combination. More on this later. Once we establish this we need to attempt
+  to multiply each element in the A.i diagonal with the corresponding element in the B.i diagonal
+  How do we line them up? We use the rule that
+
+    The column-value of an element of A must match the row-value of an element of B
+
+  If we have an element Aij and the diagonal Bi, what element in Bi matches Aij?
+  Clealy we need a reverse map from (row,col) to (i,j). Here's a useful map,
+
+          c                      c
+        i  0  1  2  3  4      j   0  1  2  3  4
+     r   ---------------    r   ---------------
+       0 | 0 -1 -2 -3 -4      0 | 0  0  0  0  0
+       1 | 1  0 -1 -2 -3      1 | 0  1  1  1  1      # DO NOT USE. SEE BELOW...
+       2 | 2  1  0 -1 -2      2 | 0  1  2  2  2
+       3 | 3  2  1  0 -1      3 | 0  1  2  3  3
+       4 | 4  3  2  1  0      4 | 0  1  2  3  4
+
+  Given these maps let's write the corresponding functions. Diag ~ i and Idx ~ j.
+
+    private static int getDiag(int row, int col) { return row - col; }
+    private static int getIdx (int row, int col) { return Math.min(row, col); }  
+
+  Now, given the column of the A element and the B diag B.i what is the Idx into B.i?
+  Actually, given the (i,j) of A and the i of B what is the j?
+
+    private static int getIdx(int i1, int j1, int i2) { 
+	int c = i1 > 0 ? j1 : j1-i1;  // the column of the first matrix, the row of the second
+	return  i2 > 0 ? c - i2 : c;  // Idx given c == row and diag of second matrix 
+    }  
+
+  OK. How do we eleminate fruitless diag multiplies? We need to know how long a diag can be. OK
+  Then we need to detect if there is any overlap possible. 
+
+  1) We compute width for each diag A, B.
+  2) getIdx(i1, width1 - 1, i2) < 0 means no possible hit on one side
+  3) getIdc(i1, 0, i2) 
+  * This is a clipping algorithm we can add later.
+
+  Need to be able to accum and element at any (i,j).
+  
+    >>> A = Variant.createSparseMatrix(3,3,2)  # lower unit triangle
+    >>> B = Variant.createSparseMatrix(3,3,2)  # lower unit triangle
+    >>> A*B
+
+10/16/2009 --------------------------------------------------------------------------------------
+
+  Here's a new indexing scheme for the Idx within a diag. It's the distance from the 
+  supporting anti-diagonal through the origin,
+
+          c                      c
+        i  0  1  2  3  4      j   0  1  2  3  4    where i = r - c
+     r   ---------------    r   ---------------          j = r + c
+       0 | 0 -1 -2 -3 -4      0 | 0  1  2  3  4     
+       1 | 1  0 -1 -2 -3      1 | 1  2  3  4  5     then r = (j + i)/2
+       2 | 2  1  0 -1 -2      2 | 2  3  4  5  6          c = (j - i)/2
+       3 | 3  2  1  0 -1      3 | 3  4  5  6  7
+       4 | 4  3  2  1  0      4 | 4  5  6  7  8
+
+  OK, now I have to re-workout SPMATRIX*VECTOR. Actually, we just change the support functions,
+
+    ...
+    vector[getRow(i, j)] += diag.get(j) * V[getCol(i,j)];
+
+  Finally I have worked out the indexing relationships. 
+    *) i is diag index, 
+    *) j is distance from anit-diagonal (NOTE: increments by 2)
+    *) c is column index
+    *) r is row index
+    *) i = r - c, j = r + c, 2r = j + i, 2c = j - i
+    *) SINCE A*B => Ac ~ Br  (columns of A are associated with rows of B and match by index)
+    *) THEN  Aj - Ai = Bj + Bi <=> Aj - Bi = Bj + Ai <=> Aj - Bj = Ai + Bi
+    *) SO    Bj = Aj - Ai - Bi
+    *) IF C = A*B THEN Cr = Ar and Cc = Bc
+    *) THUS Ci = Ai + Bi and Cj = Ai + Bj  <<< THE MONEY BALL >>>
+
+    >>> A = Variant.createSparseMatrix(3,3,1)
+    >>> A*A                                         # YEA!!!
+    1.0
+    2.0 1.0
+    1.0 2.0 1.0
+
+10/19/2009 --------------------------------------------------------------------------------------
+
+  1) Implement SPMATRIX^INT operation.
+  2) Implement VARIANT*MASK => ARRAY(VARIANT.COPY, ..., VARIANT.COPY)
+  3) Implement SPMATRIX*INT,  SPMATRIX*DOUBLE
+  4) Implement SPMATRIX*ARRAY => ARRAY(SPMATRIX*ARRAY[0], ..., SPMATRIX*ARRAY[N-1])
+  5) Implement MASK*INT    => (INT.1, INT.2, ..., INT.N)
+  6) Implement MASK*DOUBLE => (DOUBLE.1, ..., DOUBLE.N)
+  7) Implement createSparseMatrixHorizontal(SPMATRIX[])
+     	       createSparseMatrixVeritcal  (SPMATRIX[])
+	       createSparseMatrixDiagonal  (SPMATRIX[])
+
+  Need to create private SparseMatrix.overlay(SparseMatrix, row_offset, col_offset).
+  We convert from i,j to r,c, then offset r,c to rp,cp then convert to ip,jp and set.
+
+  >>> A = Variant.createSparseMatrix(4,4,3)
+  >>> A**2
+  1
+  2 1
+  3 2 1
+  4 3 2 1
+  >>> M = createMask((1,0,1,1))
+  >>> 3*M
+  (3, 0, 3, 3)
+  >>> A*M                               # it doesn't really print like this, but is should...
+  1                 1        1
+  1 1               1 1      1 1
+  1 1 1             1 1 1    1 1 1
+  1 1 1 1,        , 1 1 1 1, 1 1 1 1 
+  >>> B = Variant((1,0,-1,2))
+  >>> A*B
+  1                 -1           2
+  1 1               -1 -1        2 2
+  1 1 1             -1 -1 -1     2 2 2
+  1 1 1 1,        , -1 -1 -1 -1, 2 2 2 2
+  >>> createSparseMatrixHorizontal(A*B)     # almost prints like this,
+  1               -1          2
+  1 1             -1 -1       2 2
+  1 1 1           -1 -1 -1    2 2 2
+  1 1 1 1         -1 -1 -1 -1 2 2 2 2
+  >>> createSparseMatrixVertical(A*B)       # almost prints like this,
+   1
+   1  1
+   1  1  1
+   1  1  1  1
+
+
+
+
+  -1
+  -1 -1
+  -1 -1 -1
+  -1 -1 -1 -1
+   2
+   2  2
+   2  2  2
+   2  2  2  2
+  >>>
+  >>> createSparseMatrixDiagonal(createSparseMatrix(3,3,2)*(1,5,3))
+  1
+  1 1
+  1 1 1
+        5
+        5 5
+        5 5 5
+              3
+              3 3
+              3 3 3
+  
+  Now we need to address the createSparseMatrix(...) function. What to support? Variants.
+
+  >>> a = Variant(5)
+  >>> createSparseMatrix(a,a,a)
+  1
+  1 1
+  1 1 1
+  1 1 1 1
+  1 1 1 1 1
+
+  >>> A = createSparseMatrix(4,4,2)
+  >>> X = createVector((2,3,5,7))
+  >>> A*X
+  [2, 5, 10, 15]
+  >>> B = createSparseMatrixDiagonal(A*(1,2,-1))
+  >>> Y = createMask(B.cols()).toVector()
+  >>> B*Y
+  ...it works...
+
+  Transpose
+
+    >>> A = createSparseMatrix(4,5,2)
+    >>> B = A.T()
+    >>> A*B
+    1 1 1
+    1 2 2 1
+    1 2 3 2
+        1 2 3
+
+  VECTOR*SPMATRIX
+
+    >>> A = createSparseMatrix(4,5,2)
+    1
+    1 1
+    1 1 1
+      1 1 1 0
+    >>> B = createVector((2,3,5,1,2))
+    >>> A*B
+    [2, 5, 10, 9]
+    >>> C = createVector((2,3,5,1))
+    >>> C*A
+    [10, 9, 6, 1, 0]
+
+
+  Get/Set must be based on single integer index. This is a linear index of (r*COLS + c).
+
+    >>> A = createSparseMatrix(4,4,2)
+    >>> A[3*A.cols()] = 5
+    1
+    1 1
+    1 1 1
+    5 1 1 1
+    
+  Next we need to figure out the "back-annotaion" problem. That is to gather a subset of all the
+  items to be processed through LP, solve for their "X", then put everything back.
+  This problem is actually not too bad when we realize that we already have the relevant masks
+  created (else we couldn't load the model engine). We need to convert 'tpot' and 'cpt to a
+  vector and notice that "X" is exactly parallel to these two (parallel to each other).
+
+  cpt and tpot are NxY arrays. To create a vector, we need to know how to stack the 2D array.
+
+  Extend definition of getVector to allow 2D array
+
+    >>> Variant(((1,2,3,4),(5,6,7),(8,9))).toVector()
+    [1,2,3,4,5,6,7,8,9]
+
+  That is, natural column flatten. So for cpt we expect,
+
+    ((p00,p01,p02),(p10,p11,p12)).toVector() is [p00,p01,p02,p10,p11,p12]
+
+  How do we "go the other way". We have a vector (or array, I suppose) and we want to create
+  a 2D array. We need to feed in the desired shape.
+
+  Need to extend toArray to allow a parameter or two. But how to handle. The immediate problem
+  is to handle 1D VECTOR and fold it up into a 2D array of DOUBLEs. If we say: 5 then we mean
+  the length of the subarray. But then we could create a detailed 2D array where we fold the
+  array into different length subarrays. We don't need to assume rectangular arrays. If we 
+  give detailed sub-array lengths then we need to be sure they add up to the length of the 
+  original vector (or array). We need a convenient way to get those detailed subarray lengths.
+
+  What about a special function that returns an array that details the lengths of the sub-arrays.
+  OK. Suppose 2D array: ((1,2,3),(4,5)) then we expect array (3,2). 
+  Suppose 3D array: (((1,2,3),(4,5)),(6,7,8,9)) then we expect array ((3,2),4)
+  Suppose 1D array: (1,2,3,4) then we expect (4)
+
+  Function should be called "shape()".
+
+    This function must look ahead and say if it hits all single values then it rolls that into
+    just COUNT.
+
+    
+    >>> Variant((1,2,3,4)).shape()
+    (4)
+    >>> Variant((((1,2,3),(4,5)),(6,7,8,9))).shape()
+    ((3, 2), 4)
+    >>> Variant(((1,2,3),(4,5,6))).shape()
+    (3, 3)
+
+  Notice that we don't say (2,3) in the above example. This is because we describe each sub-array
+  We are not describing inherently rectangular objects, but nD arrays.
+
+  Now we can convert a VECTOR to a shaped array. We simply walk the shape allocating sub-arrays
+  of the appropriate length and filling them as we go. This "uses up" values in the VECTOR.
+
+10/20/2009 --------------------------------------------------------------------------------------
+
+  The shape() function is proving tricky in general, but it's an important feature for back-
+  annotation. This is monster of a function. Let's test it out.
+
+  Without runlength compression,
+
+    >>> Variant((1,2,3,4)).shape()                             # 4
+    >>> Variant(((1,2,3),(4,5))).shape()                       # (3, 2)
+    >>> Variant(((1,2,3),(4,5,6))).shape()                     # (3, 3)
+    >>> Variant((((1,2,3),(4,5)),(6,7,8,9))).shape()           # ((3, 2), 4)
+    >>> Variant((((1,2,3),(4,5,6)),(6,7,8,9))).shape()         # ((3, 3), 4)
+    >>> Variant((((1,2,3),(4,5,6)),((6,7,9),(8,9,0)))).shape() # ((3, 3), (3, 3))
+
+  Wrap all results with parens
+
+    >>> Variant((1,2,3,4)).shape()                             # (4)
+    >>> Variant(((1,2,3),(4,5))).shape()                       # ((3), (2))
+    >>> Variant(((1,2,3),(4,5,6))).shape()                     # ((3), (3))
+    >>> Variant((((1,2,3),(4,5)),(6,7,8,9))).shape()           # (((3), (2)), (4))
+    >>> Variant((((1,2,3),(4,5,6)),(6,7,8,9))).shape()         # (((3), (3)), (4))
+    >>> Variant((((1,2,3),(4,5,6)),((6,7,9),(8,9,0)))).shape() # (((3), (3)), ((3), (3)))
+
+  Finally, With runlength compression,
+
+    >>> Variant((1,2,3,4)).shape()                             # (4)
+    >>> Variant(((1,2,3),(4,5))).shape()                       # ((3), (2))
+    >>> Variant(((1,2,3),(4,5,6))).shape()                     # (2, 3)
+    >>> Variant((((1,2,3),(4,5)),(6,7,8,9))).shape()           # (((3), (2)), (4))
+    >>> Variant((((1,2,3),(4,5,6)),(6,7,8,9))).shape()         # ((2, 3), (4))
+    >>> Variant((((1,2,3),(4,5,6)),((6,7,9),(8,9,0)))).shape() # (2, 2, 3) 
+
+  Now we need to reshape(SHAPE)...
+
+    Since SHAPE is assumed to be an ARRAY of (ARRAY or INT) here's how we read it,
+    (4) => create an array of 4 elements
+    ((3),(2)) => create an array of 2 elements, the first is an array of 3 elements, the next 2.
+    (2, 3) => create an array of 2 elements each is an array of 3 elements.
+    (((3),(2)),(4)) => create an array of 2 elements.
+    		       the first is an array of 2 elements or a 3- and 2-element array
+		       the second is an array of 4 elements.
+    ((2,3),(4)) => create an array of 2 elements
+    		   the first is a (2,3) array
+		   the second is an array of 4 elements.
+    (2,2,3) => create an array of 2 elements each of which is an array of 2 elements
+    	       each of which is an array of 3 elements.
+    
+    Clearly the rules are reasonably simple and hierarchical. We should have a routine 
+    which we hand it a SHAPE to fill in. There are two kinds of loops: the first is over
+    SHAPEs and the other is over dimenions. All of them are handed an array and an offset which
+    they increment, pulling off elements as the go and attaching them into their new array.
+
+    Here's how it works. Notice it's tolerant to mixed ints and arrays and under spec.
+
+      >>> Variant((1,2,3,4,5,6)).reshape(4)           # (1, 2, 3, 4)
+      >>> Variant((1,2,3,4,5,6)).reshape((2,3))       # ((1, 2, 3), (4, 5, 6))
+      >>> Variant((1,2,3,4,5,6)).reshape((3,2))       # ((1, 2), (3, 4), (5, 6))
+      >>> Variant((1,2,3,4,5,6)).reshape((2,2))       # ((1, 2), (3, 4))
+      >>> Variant((1,2,3,4,5,6)).reshape(((2,2),2))   # (((1, 2), (3, 4)), (5, 6))
+
+   We needed to build in the INT/ARRAY mixing tolerance because in Python (4) == 4
+
+   Now let's try the reshape using the new getFlatArray() function.
+
+      >>> Variant(((1,2,3),(4,5,6))).reshape((3,2))   # ((1, 2), (3, 4), (5, 6))
+
+   ===============================================================================
+
+   Time to regroup. Here's where we're at,
+   I've gathered about all the policy parameters I want to support for a first run.
+   The next thing to do is to build the LP engine and then pour the data fragments into it.
+   Clearly getting the LP engine running with test data will have to come first.
+   Let's do that next. Here's what we need,
+
+     http://bjoern.dapnet.de/glpk/      The website
+     ~/develop/java/glpk/               The linux version (.jar and .so)
+     ~/develop/jboss/glpk               The full package (with source)
+     ~/develop/notes/python_howto/glpk  The manual
+
+   We need to include the glpk.jar in the CLASSPATH. Make it part of the project.
+   in ~/.bashrc add,
+
+     export CLASSPATH=.:$PHoX/lib/glpk.jar:$JYTHON/jython.jar
+     export LD_LIBRARY_PATH=$PHoX/lib
+
+   in jython we can say,
+
+     >>> import org.gnu.glpk as glpk
+     
+   if we have the "example.mod" file from the ./python_howto/glpk directory above we can say,
+
+     >>> from org.gnu.glpk import *
+     >>> solver = GlpkSolver()
+
+   This is primarily a JAVA tool, not a JYTHON tool. I think it's actually working, but
+   I'll need to really fire it up to make sure. Got to run...Steve at 11:30a Wednesday!
+
+10/21/2009 --------------------------------------------------------------------------------------
+
+  Let's get GLPK running. I'll need a wrapper that understands Variants. We do not have the 
+  Variant understanding GLPK or it's adapting class.
+  
+  So what does the adapting class look like? Called LPSolver we load it into Jython.
+  Let's get it to work first and see what it should look like. It clearly should accept
+  An A matrix and a B vector and a C cost vector where
+
+        min{C^X | AX <= B}
+
+  It should return status and the minimizing X. It works!
+  Let's forego the LPSolver since it's too simple. The GlpkSolver is good enough.
+  We'll introduce ModelEngine.java
+
+  Here's how to use in Jython (test version),
+
+    >>> import com.carbonmodelinggroup.PHoX.util.LPSolver as LPSolver
+    >>> A = LPSolver()
+    Z = 733.33333, x1 = 33.33333, x2 = 66.666667, x3 = 0.0   # (OOPS) getting integer results
+    
+    Functions.py defines maximizeLP(p, A, b) and minimizeLP(p, A, b)
+
+    >>> p  = (10, 6, 4)
+    >>> A  = ((1,1,1), (10,4,5), (2,2,6))
+    >>> b  = (100, 600, 300)
+    >>> LP = maximizeLP(p, A, b)
+
+  PROBLEM. The GLPK-JNI code hit an instant and unsettling bug. It also locked into a specific
+  version of the GLPK. With the new GLPK-JAVA project I need to get the GLPK separately.
+  Let's do this...
+
+    http://ftp.gnu.org/gnu/glpk/
+    get: glpk-4.39.tar.gz
+
+    http://sourceforge.net/projects/glpk-java/
+    get: glpk-java-1.0.3.tar.gz    
+
+    put:  ~/develop/java/glpk
+
+    in: ./glpk-4.39
+    %> ./configure
+    %> make
+    %> sudo make install
+    %> ls /usr/local/bin
+    %> glpsol                # new command line tool.
+    %> ls /usr/local/lib     # the libglpk.so file
+    %> ls /usr/local/include # this header file for the glpk-java
+
+    for GLPK-JAVA we need to edit swig/Makefile to show where glpk.h is found.
+    We don't need to update the prefix or include for GLPK. Just go...
+
+    (NB: This doesn't work. See glpk.txt)
+
+    in ./glpk-java-1.0.3
+    %> sudo apt-get install swig    # needed build tool
+    %> sudo apt-get install libtool # needed build tool
+    %> make clean
+    
+      src/java/glpk_wrap.c:133:17: error: jni.h: No such file or directory 
+      	which just says: #include <jni.h>
+
+    edit swig/Makefile
+    INCLUDES:= -I/usr/lib/jvm/java-1.5.0-sun-1.5.0.19/include \
+               -I/usr/lib/jvm/java-1.5.0-sun-1.5.0.19/include/linux
+
+    and for each <gcc> make sure to include the includes for jni.h and jni_md.h
+    <gcc> $(INCLUDES) ...
+	
+    %> make 
+    %> sudo make install
+    Libraries have been installed in:
+    %> export LD_LIBRARY_PATH=/usr/local/lib/jni
+    Add to CLASSPATH
+    %> export CLASSPATH=/usr/local/share/java/glpk-java.jar
+
+    >>> from org.gnu.glpk import *
+    PUKEPUKEPUKEPUKEPUKE.....etc.
+
+10/22/2009 --------------------------------------------------------------------------------------
+
+  New tack. We try to use SWIG to generate an interface directly. Found an email,
+
+    %> mkdir -p java/org/gnu/glpk
+    %> swig -java -package org.gnu.glpk -o src/glpk_wrap.c -outdir java/org/gnu/glpk glpk.i
+    * jar up the contents of the "java" directory into glpk.jar, 
+    * compile the GLPK sources along with the generated "src/glpk_wrap.c" into a shared library 
+    * link the code should against the jvm and contain jni.h and jni_md.h in the includes path
+
+  Humph. Let's look again at GLPK-JAVA,
+  (This works)
+
+  NOTE: First remove any old GLPKs laying around and install the new one (4.39)
+
+    The include files I need (jni.h and jni_md.h) are located as follows,
+      $JAVA_HOME/include
+      $JAVA_HOME/include/linux
+    Notice in $GLPK_JAVA no ./src or ./java directories. Created automatically.
+    Notice these lines,
+
+      %> export SWIG_FLAGS="-I/usr/local/include -I/usr/include"
+      %> export INCLUDES="-I$JAVA_HOME/include -I$JAVA_HOME/include/linux"
+      %> export VERSION_INFO=24:0:24                  # from glpk package: src/Makefile.am
+      %> export REVISION=4.39                         # from glpk package: configure.ac
+      %> export PREFIX=/usr/local
+      %> mkdir -p src/java
+      %> mkdir -p java/org/gnu/glpk
+      %> swig $SWIG_FLAGS -java -package org.gnu.glpk \
+          -o src/java/glpk_wrap.c -outdir java/org/gnu/glpk swig/glpk.i
+      %> libtool --mode=compile gcc $INCLUDES -c -fPIC src/java/glpk_wrap.c
+      %> libtool --mode=link \
+		gcc $INCLUDES -version-info $VERSION_INFO -revision $REVISION \
+		-g -O -o libglpk_java.la -rpath $PREFIX/lib/jni glpk_wrap.lo \
+		-L$PREFIX/lib -lglpk 
+      %> javac -classpath java/org/gnu/glpk/ java/org/gnu/glpk/*.java
+      %> jar cf java/glpk-java.jar -C java/ org
+
+    Install,
+
+      %> sudo mkdir -p -m 755 $PREFIX/lib/jni;true
+      %> sudo libtool --mode=install install -c libglpk_java.la $PREFIX/lib/jni/libglpk_java.la
+      %> sudo libtool --mode=finish $PREFIX/lib/jni
+      %> sudo mkdir -p -m 755 $PREFIX/share/java;true
+      %> sudo install -m 644 java/glpk-java.jar $PREFIX/share/java/glpk-java-$REVISION.jar
+      %> sudo ln -fs $PREFIX/share/java/glpk-java-$REVISION.jar $PREFIX/share/java/glpk-java.jar
+
+    Now set the environment,
+
+      %> export LD_LIBRARY_PATH=/usr/local/lib/jni:/usr/local/lib
+      %> export CLASSPATH=$CLASSPATH:/usr/local/share/java/glpk-java.jar
+
+    Let's try it out.
+
+      %> cd ./examples;javac GLPKSwig.java;cd ..
+      %> cd ./examples;java -Djava.library.path=/usr/local/lib/jni GLPKSwig marbles.mod;cd ..
+
+    It works! It solves the marbles problem fully.
+    
+    TODO: Update the swig/Makefile to reflect changes above.
+
+      >>> import org.gnu.glpk.GLPK as glpk
+      >>> dir(glpk)
+      ...lots of stuff. Is this from the .so or just the .jar?
+
+    Let's try the command line,
+
+      %> java -Djava.library.path=/usr/local/lib/jni com.carbonmodelinggroup.PHoX.util.GlpkSolver
+      OK
+    
+    TODO: Figure out a better way to set the java.library.path in Jython. 
+    ANS : %> export JAVA_OPTIONS=-Djava.library.path=/usr/local/lib/jni
+
+      %> jython -Djava.library.path=/usr/local/lib/jni
+      >>> import com.carbonmodelinggroup.PHoX.util.GlpkSolver as GlpkSolver
+      OK
+
+    Update Functions.py and try it out. Here's the test problem
+
+      Maximize: 10x +6y + 4z   s.t.
+            x +  y +  z <= 100
+	  10x + 4y + 5z <= 600
+	   2x + 2y + 6z <= 300
+      Answer: x = 33.3333, y = 66.6666, z = 0. and the maximum value is 733.33333
+
+      >>> p  = (10, 6, 4)
+      >>> A  = ((1,1,1), (10,4,5), (2,2,6))
+      >>> b  = (100, 600, 300)
+      >>> maximizeLP(p, A, b)
+      Objective = 733.3333 (33.33333, 66.66666, 0.0)
+
+    --or--
+      
+      >>> maximizeLP((10,6,4), ((1,1,1), (10,4,5), (2,2,6)), (100,600,300))
+      Objective = 733.3333 (33.33333, 66.66666, 0.0)
+
+    NOTE: since I set the LD_LIBRARY_PATH correctly I don't need java.library.path. FALSE!
+    ANS:  %>export JAVA_OPTIONS=-Djava.library.path=/usr/local/lib/jni
+
+  =============================================================================
+
+  Let's build the bridge to the GlpkSolver. Here's what we have to do,
+
+  Referring to the Model Description Econ Version document,
+
+  1) Non-Negativity Constraint
+
+     A_1 X <= b_1
+     
+     A_1 = -I_{NTxNT}, 
+     b_1 = 0_{NT}
+
+     We know T = total number of model years (typ. 9)
+     The N is the number of items we actually model. That is related to the original dataset.
+
+  2) Capacity Constraint
+
+     A_2 X <= b_2
+
+     A_2 = Diag(L(T)) where we have N diagonal blocks of lower unit triangular matricies. [NTxNT]
+     b_2 = Q is the capacity constraint for the N items for each of T years. [NTx1]
+
+  3) Demand Constraint
+
+     A_3 X <= b_3
+
+     A_3 = -Horiz(L(T)*L(T)) is a block horizontal double lower triangular matrix. [TxNT]
+     b_3 = -D the cumulative demand in each of T mode years. [Tx1]
+
+  4) Compliance Constraint
+
+     A_4 X <= b_4
+
+     A_4 = -Horiz(L(T)*L[cap](T)) is similar to above, but only for capped items. [TxNT]
+     b_4 = -(D - rho*e)           rho is percentage (of emissions e) [Tx1]
+     
+  5) Mandatory Constaint(s)
+
+     Save for later. A diagonal system tacked on to the above.
+
+  There are some concepts not fully represented above. The first is N. The number of items
+  is not known until all the bits and pieces are created. The N may include mandatory items
+  not mentioned as Cap or Offset items, it may include twins. This is non-trivial.
+
+  If we don't handle Mandatory or even the compliance constraint in the first pass. 
+  Then we still need to know the demand D. This is a separate code module (like subsectors).
+  We will need to know the offset restrictions (rho) and emissions. Later? Same module?
+  
+  Anywho we need to create a mask of length N that captures the Cap items, Offset items, etc.
+  
+  So the problem is to construct an N-Mask of Cap items, another of Offset items, etc.
+
+  I need to review ModelPrep to see how the workset and it's later items are handled...
+  What happens to newly created items? How are masks like the CARBON_TAX handled?
+
+  So we'll have a whole set of worksets that we want to append en masse. We should be able to
+  do this and receive a receipt of full-length masks for each item in order. An array of masks
+  written into the newly created workset.
+
+    broadAppend(ARRAY{STRING_MAP}) -> STRING_MAP{original keys plus ARRAY{MASK}}
+
+  weird. needs work and research.
+  
+10/23/2009 --------------------------------------------------------------------------------------
+
+  We start with separate worksets containing 'tpot' and 'cpt' each of which is [N_i x T]
+  The 'tpot's will each be flattened to [N_i*T x 1] and then stacked. Here's the toys,
+
+    >>> T1 = Variant(((1,2,3),(4,5,6)))
+    >>> T2 = Variant(((7,8,9)))
+
+  We have .toVector() which implies flatten up to 2D array. And we can create a vector
+  based on whatever so here's something,
+
+    >>> T0 = Variant(((1,2,3),(4,5,6))).toVector()
+    >>> T1 = Variant(((7,8,9))).toVector()
+    >>> T  = createVector([T0, T1])                  # [1,2,3,4,5,6,7,8,9] ... a VECTOR
+    >>> M  = createPartition([T0, T1])               # uses toInteger() internally
+    >>> T[M]                                         # for fun and profit.
+   ((1.0, 2.0, 3.0, 4.0, 5.0, 6.0), (7.0, 8.0, 9.0))
+   >>> X0 = T[M][0]
+   >>> X0 = X0.reshape((X0.size()/3),3))             # ((1,2,3), (4,5,6))
+
+    NOTE: ARRAY.toInteger() == ARRAY.size()
+
+    >>> createPartition([3,5,2])
+    ((T,T,T,F,F,F,F,F,F,F),(F,F,F,T,T,T,T,T,F,F),(F,F,F,F,F,F,F,F,T,T))
+
+    >>> T[createPartition([3,4,2])]
+    ((1,2,3), (4,5,6,7), (8,9))
+
+  And it works. We now have an array of non-overlapping parallel masks of length T.size().
+
+  Given parallelMasks we should be able to just say,
+
+    ARRAY[M] => (ARRAY[M0], ..., ARRAY[Mn-1])
+
+  NOTE: Revisit applyArray() and have it depend on what's being applied.
+  Thus a "Partition" is: an array of ordered parallel non-intersecting masks.
+
+  What we have created in the ModelPrep are the following,
+  1) workset                    # original set of processed items, filtered for validity
+  2) workset_ceiling            # just carbon tax
+  3) cap_trade_floorset         # Capped items that are internally traded. Still capped.
+  4) workset_early_action       # is a workset, but missing Region, Sector, etc. since NA.
+
+  We've built a few masks,
+  1) cap_trade_mask             # (417) used for original processed items
+  2) offset_mask                # (417) ditto
+  3) valid_mask                 # (417) (sum == 401) used to mask valid items (non-inf, etc.)
+  4) work_cap_trade_mask        # (401) (sum == 58) compatible with original workset
+  5) work_offset_mask           # (401) ditto
+  6) ..implied mask..           # we didn't create a mask for the workset_ceiling yet.
+  7) cap_trade_floor_item_mask  # (58) (sum == 13) used to make the cap_trade_floorset.
+  8) ..implied mask..           # Another mask of 1 not actually created.
+
+  We need a better plan on where we're going with this. We've taken the original dataset and
+  created some derivative or wholly new items. The question becomes, how do we associate
+  policies with these new items? What are the policies in question?
+
+  There are several policies left to be addressed. The first is for "Capped Sector" items,
+  the next for "Offset Items", beyond these we have twinning, mandatory and perhaps more.
+
+  If we split the items into more buckets for the same of the model engine then we 
+  exacerbate the back-annotation problem. If we keep everything in one bucket we have the
+  shape-shifting mask problem. There is some basic game to be played here. Let's find it.
+
+  In the original workset we have an initial partition of (Capped, Offset, Other)
+  To this we apply a filter of Valid. This does not change the categories, but subsets each one.
+  The Carbon Tax is a new category. Let's pick on this one...
+
+  Suppose we could say to some Regsitry , here's a set of items along with a named maskset.
+  If we hand the Registry another set of items (with another named maskset) and do this
+  several times...we should be able to ask for the data in special ways. It's a cross reference.
+
+  Each time we register a set of items with a named maskset...we could have the named maskset
+  that is, a maskset that has a name and each mask within is given a name.
+
+10/24/2009 --------------------------------------------------------------------------------------
+
+  We need to add to the workset. It needs to contain a set of masks. Here are the masks we need,
+  1) CAP_TRADE_MASK
+  2) OFFSET_MASK
+  *) <other>
+
+  As we build the new/derivative worksets we need to respect the maskset (informal collection).
+  We could do an informal collection with flat namespace or we might consider a
+  named collection. All arrays must remain parallel so if we say,
+
+    >>> D = Variant({'a':(1,2,3), 'b':(4,5,6), 'm':{'c':(7,8,9), 'd':(10,11,12)}})
+    >>> D[1:]
+    {a:(2,3), b:(5,6), m:{c:(8,9), d:(11,12)}}
+
+  The principle is that SPLICE's flow through STRING_MAP. That is, STRING_MAP is treated as
+  a "structural feature" rather than a "targeted feature". How do we make this universal?
+
+  Thus we can put our maskset in first and it will be carried along for free.
+
+    >>> from ModelPrep import *
+    >>> a = workset[130:132].copy()
+    >>> a['MASK'].setFalse()
+
+10/26/2009 --------------------------------------------------------------------------------------
+
+  New idea. Create a ModelEngine.py module to wrap the LP engine and encode all the issues.
+  OK, this is just like before superficially, but this module accepts a dataset containing
+  specific structures including masks.
+
+  A mask-structure substructure is the set of twin masks. Or set of twin things. Masks are
+  inefficient for this purpose, but we're getting ahead of ourselves.
+
+  First we upgrade the stack() function in Variant. Needs to address "structural features".
+
+    >>> A = Variant({'a':(1,2,3), 'b':(6,5,4)})
+    >>> B = Variant({'a':(4,5,6), 'b':(3,2,1)})
+    >>> stack([A,B])
+    {a:(1,2,3,4,5,6), b:(6,5,4,3,2,1)}
+
+    >>> A = Variant({'a':(1,2,3), 'b':{'c':(6,5,4), 'd':(1,11,111)}})
+    >>> B = Variant({'a':(4,5,6), 'b':{'c':(3,2,1), 'd':(1111,11111,111111)}})
+    >>> stack([A,B])
+    
+    >>> A = Variant({'a': {'b': (1), 'c': (3)}})
+    >>> B = Variant({'a': {'b': (2), 'c': (4)}})
+    >>> stack([A, B])                               # this works as designed.
+    {a:{b:(1,2), c:(3,4)}}
+
+    >>> stack([1.0,2,3,4,5])                        # a VECTOR (first element is a DOUBLE)
+    [1.0, 2.0, 3.0, 4.0, 5.0]
+
+    >>> stack([1,2,3.0,4])                          # ARRAY perfected to INTs
+    (1,2,3,4)
+
+    >>> stack([createMask((1,0)), createMask((0,1,0))])
+    (T, F, F, T, F)
+
+    >>> createVector(5)                             # new feature.
+    [0,0,0,0,0]    
+
+  Need to create a mask that is the OR or a set of masks. This an add() method.
+
+    >>> m = Variant({'a':createMask((1,0,1,1)), 'b':createMask((1,0,0,0))})
+    >>> m.add()
+    (T,F,T,T)
+
+  Need to upgrade compares to process vectors,
+
+    >>> A = createVector((1,2,3,4))
+    >>> B = createVector((1,1,3,4))
+    >>> B < A                        # mostly false
+    (F, T, F, F)
+    >>> A <= A)                      # fully true
+    (T, T, T, T)
+    >>> (A <= A).isTrue()            # returns Boolean
+    True
+
+  Now we have to tool(s) we need to proceed with the Engine startup.
+
+  First we notice that some 'tpot' capacities are negative. Want all the rows where some tpot
+  is negative. If I say 'tpot' < 0 I get a 2D mask.
+  
+    >>> A = Variant(((-1,2,3),(4,-5,6),(7,8,9)))
+    >>> A < 0
+    ((T, F, F), (F, T, F), (F, F, F))
+    >>> S = (A < 0).sum()               # (1, 1, 0)
+    >>> A[S > 0]
+    ((-1, 2, 3), (4, -5, 6))            # this is how to access 2D array of values by criteria
+    >>> A[(A < 0).sum() > 0]            # 1-line version
+
+  If we apply this to the activeset we're about to stuff into the ModelEngine we find,
+
+    >>> activeset['Sector'][(Q<0).sum() > 0]
+    (Electric, Electric, Electric, Electric)
+
+  To test the capacity constraint, we're really testing A1 * diff(Q) <= q
+  We do need to diff(Q). Let's see what we have laying around...
+
+    >>> q = Variant((1,2,3,4,5,6))
+    >>> Q = q.reshape((2,3))
+    >>> Q.diff()
+
+  Note: Access of SparseMatrix by index returns row vector.
+
+  Here's the issue in the SparseMatrix multiply...
+    >>> b1[656]       == 1.4565898884773254
+    >>> A1[656]*X     == 1.4565898884773254
+    >>> (A1 * X)[656] == 1.4565898884773256   <<<< Off by a little bit. Why?
+
+  That little error above is a nuisance, but not why the model doesn't run.
+  What is needed is a toy dataset that we know works. Let's try one,
+
+    >>> P    = Variant(((100, 110), (6, 8), (4, 5)))
+    >>> Q    = Variant(((2, 3), (5, 7), (4, 9)))
+    >>> d    = Variant((7,20)).toVector()
+    >>> mask = createMask((1,1,1))
+    >>> N    = P.size()
+    >>> T    = P[0].size()
+    >>> Y    = Q.diff()
+    >>> p    = P.toVector()
+    >>> q    = Q.toVector()
+    >>> y    = Y.toVector()  # for testing:  Ai*y <= bi, i = 0,1,...
+    >>> A0   = -createSparseMatrix(N*T, N*T, 0)
+    >>> b0   = createVector(N*T)
+    >>> LT   = createSparseMatrix(T, T, T)
+    >>> A1   = createSparseMatrixDiagonal(LT * mask )
+    >>> b1   = q
+    >>> LT2  = LT**2
+    >>> A2   = -createSparseMatrixHorizontal(LT2 * mask)
+    >>> b2   = -d
+    >>> A    = createSparseMatrixVertical((A0, A1, A2))
+    >>> b    = createVector((b0, b1, b2))
+    >>> LP   = minimizeLP(p, A, b)
+    >>> x    = createVector(LP.getX())    # [0,0,5, 0,4,2]
+
+  Produces an answer, but claims it is infeasible. Oh, it's fixed now. Tiny, but important bug.
+  Remember,
+
+    %> cd $PHoX/config
+    %> jython
+    >>> from ModelPrep import *
+
+10/28/2009 --------------------------------------------------------------------------------------
+
+  Two things. 
+  1) costs are not calculated correctly (no cost of ownership...)
+  2) figure demand instead of just stub values.
+
+  I want to create SparseMatricies based on an array of lifetimes (minus 1).
+  Some items only last 1 period (lifetime = 0 extra years)
+  Some items are immortal (lifetime = T-1 extra years)
+  Some items are only purchased to a time. Non-trivial lifetime.
+  What we're really saying is that we have a cash-flow pattern. Maybe later...
+
+  Given N items we need N lifetimes and then N TxT SparseMatricies (diagonal)
+  
+  extended createSparseMatrix as follows,
+
+    >>> createSparseMatrixDiagonal(createSparseMatrix(2,2,(-1,1,0.0)))  # doubles & vectors OK
+    1 1
+      1
+        1
+        1 1
+            1
+              1
+    
+  to use this new extension for pricing we need to construct the lifetime array.
+
+  First let's test the get/set for VECTOR's
+
+    >>> m = createMask((1,0,1,1))
+    >>> v = createVector(m.size())
+    >>> v[m] = 3                       # (3, 0, 3, 3)
+    >>> v["1:"] = 5                    # (3, 5, 5, 5)
+    >>> v[(1,3)] = -2                  # (3,-2, 5,-2)
+    >>> v[(1,3)] = (7,8)               # (3, 7, 5, 8)
+
+  To figure Demand... (we also need emissions information for offset restrictions),
+
+  Created: config/Demand.py        code module.
+  Created: reference/Emissions.py  data module.
+
+  IDEA: create universal parameters. Mostly from UserConfig. Can we make Variant do this?
+   	It could either be handled with a post process or allow a lookup-table to be
+	registered statically with the Variant just like inflation with an access protocol.
+	Something like "<parameter name>"... or "<this/config/module/param>"
+
+	The Variant constructor is handed a Pythonized version of the reference module.
+	Whenever it hits a PyString it could intercept and do a quick lookup if appropriate.
+
+	This could be used as an alternative to the Complex construction of Money+jYear.
+
+10/29/2009 --------------------------------------------------------------------------------------
+
+  Continuing with Demand.py.
+
+  We have some data with default linear interpolation for emissions from each known sector.
+  This seems rather trivial, but you have to start somewhere. A different emission module for
+  each sector is not yet indicated, but more detailed data would be nice.
+
+  We need to separate LCFS emissions from refinery emissions given some percentage. Let's
+  just fix the percentage for now.
+
+    >>> from Functions import *
+    >>> table = Variant.open("../data/CMM_FY.csv")
+    >>> code  = open('datamodules/CMM.py').read()
+    >>> cmm   = Variant.interpret(Variant(code), Variant({"TABLE":table, "OCP":9, "R":.05}))
+    
+  This ^ needs to be upgraded. If we embed references to Variant maps as <delimited> strings
+  then we can scan for dependencies!
+
+    NB: Inflation handler will not be set....prices vary.
+    >>> from References import *
+    >>> from Functions import *
+    >>> FuelPrices(("NG", "NG"), ("CA", "WCI"), arange2((2006, 2009), (3, 3)) )
+    ((7.623657428, 8.812170963, 9.058999904), (7.499642807, 7.053786409, 6.687445591))
+    >>> V_FP.lookup( Variant((("NG","NG"), ("CA","WCI"), ((2006,2007,2008), (2009,2010,2011)))))
+    ((7.623657428, 8.812170963, 9.058999904), (7.499642807, 7.053786409, 6.687445591))
+    >>> V_FP.lookup( Variant((["NG"], ["CA"], [[2006,2007,2008]])) )
+    ((7.623657428, 8.812170963, 9.058999904))
+    >>> V_FP.lookup( Variant(("NG", "CA", [2006,2007,2008])) )  # Fails, for now...
+    >>> V_FP.lookup( Variant("NG") )
+    <second tier STRING_MAP>
+    >>> V_FP.lookup( Variant(["NG", "CA"]) )
+
+  NOTE: Rebuilding lookup() method,
+
+  We need to revisit lookup() method. It's more properly a sequential get(), but allows 
+  for array keys, a multi-lookup. How about a simple this.get(<first key>). The problem is
+  "what happens next...". We "get" either an array of results or a single result depending
+  on that type of key. ARRAY is structural (versus active) in this case. If the second key
+  is  an ARRAY then we assume it's parallel to the first and split and apply this second
+  key to each first result separately. This sounds familiar...
+
+    >>> m = Variant({"a":{"A":1, "B":2}, "b":{"A":3, "B":4}})
+    >>> m.lookup("a")
+    {A: 1, B:2}
+    >>> m.lookup([("a","a","b")])
+    ({A: 1, B: 2}, {A: 1, B: 2}, {A: 3, B: 4})
+    >>> m.lookup(['a', 'A'])
+    1
+    >>> m.lookup(["a", ("A", "A", "B")])
+    (1, 1, 2)
+    >>> m.lookup([("a","b","a"), ("A", "A", "B")])
+    (1, 3, 2)
+    >>> m.lookup([("a","b","a"), "A"])
+    (1, 3, 1)
+    >>> m.lookup([["a"], ["A"]])
+    (1)
+
+    >>> m = Variant({"a":{1:1.2, 2:2.5}, "b":{2:3.7, 3:4.8}})
+    >>> m['a'][3]
+    3.8
+    >>> m.lookup('a')
+    [LinearFunction: (intercept: -0.1, slope: 1.3), {2: 2.5, 1: 1.2}]
+    >>> m.lookup(['a'])
+    [LinearFunction: (intercept: -0.1, slope: 1.3), {2: 2.5, 1: 1.2}]
+    >>> m.lookup([['a','b']])
+    ([LinearFunction: (intercept: -0.1, slope: 1.3), {2: 2.5, 1: 1.2}], 
+     [LinearFunction: (intercept:  1.5, slope: 1.1), {2: 3.7, 3: 4.8}])
+    >>> m.lookup(['a',3])
+    3.8
+    >>> m.lookup(['a',[3]])
+    (3.8)
+    >>> m.lookup([('a','b'),3])
+    (3.8, 4.8)
+    >>> m.lookup([('a','b'),(3,4)])
+    (3.8, 5.9)
+    >>> m.lookup([('a','b','a'),(3,4,4)])
+    (3.8, 5.9, 5.1)
+    >>> m.lookup(['a',(3,4,5)])
+    (3.8, 5.1, 6.4)
+    >>> m.lookup([['a'],[(3,4,5)]])
+    ((3.8, 5.1, 6.4))
+
+    >>> from References import *                       # Warning: inflation handler not set
+    >>> V_EMIT.lookup(("CA", "Transport", (2004, 2012, 2020)))
+    (10700000, 1.35E7, 16300000)
+    >>> V_FP.lookup( Variant((["NG"], ["CA"], [[2006,2007,2008]])) )
+    ((7.623657428, 8.812170963, 9.058999904))
+    >>> V_FP.lookup( ("NG", "CA", [2006,2007,2008]) )    # works now.
+    (7.623657428, 8.812170963, 9.058999904)
+    >>> V_FP.lookup( (["NG"], ["CA"], [[2006,2007,2008]]) )   # so does this...
+    ((7.623657428, 8.812170963, 9.058999904))
+
+  Notice, we don't need References.py anymore...
+    >>> from References import *                       # Warning: inflation handler not set
+    >>> Emissions("CA", "Agriculture", (2004,2012,2020))
+    (13800000, 1.37E7, 13600000)
+
+  may be replaced by,
+
+    >>> from Functions import *
+    >>> from references.Emissions  import Emissions
+    >>> Variant(Emissions).lookup(("CA", "Agriculture", (2004,2012,2020)))
+    (13800000, 1.37E7, 13600000)
+    
+  or we could create a function (assuming the existence of static reference registration,
+
+    (in Functions.py)
+    def lookup(name, x):
+    	if not Variant.registryHas(name):
+           execfile("references/"+name+".py")  # we assume "name.py" in ./references subdirectory
+           Variant.registrySet(Variant(name), Variant(eval(name)))
+    	return Variant.registryGet(name).lookup(x)
+
+  Let's try it out,
+
+    >>> from Functions import *
+    >>> lookup("Emissions", ("CA", "Agriculture", (2004, 2012, 2020)))  # loads .py file once.
+    (13800000, 1.37E7, 13600000)
+
+  Let's put it in place. Here's CMM_FY:cpt (orig) from Dataset >>> first_results[0]['cpt']
+  
+  (NaN, NaN, NaN, 6.465956039132465, 14.113073446286192, 0.5430928242274222, -2.3207380635762123, -1.186674983238784, 0.19661971691937224, -0.23338979367264362, 0.14856637952260102, 0.2083116487356992, -0.26433973711171016,0.0953877757402472, 0.20701914614236014)
+
+  Yup. It works. We can now set the config map into the Variant. It's out GLOBAL.
+
+  Now we need to find a nice way to say (and use),
+
+    >>> execfile("UserConfig.py")
+    >>> Variant.registrySet("config", Variant(eval("UserConfig")))
+    >>> Variant.registryGet("config").keys()
+    >>> Variant.registryGet("config")["Additionality Level"]
+
+  Maybe a Get(name, key) function? Or collapse namespaces and just Get(key)? Or assume "config"?
+
+10/30/2009 --------------------------------------------------------------------------------------
+
+  Let's upgrade the Lookup function to mean lookup from registry. We'll capture key lookups 
+  until reset. What we really want is the keys into UserConfig, but let's not make that
+  an assumption.
+
+  This means that creating the registry is a two-step process. We load it, then access. 
+  Not load-on-first-access.
+
+    >>> registerPythonFile("UserConfig")
+    >>> Lookup("UserConfig", "Additionality Level")
+
+  NOTE: In the new scheme code modules are knowledgable about the UserConfig and it's contents.
+  	They assume that such a structure exists in the global Variant registry. 
+  NOTE: The global variant registry will need to be pushed down one level of indirection
+  	to allow for multi-user. Not a big issue, but an inevitable one, I think.
+  NOTE: It's bad form to reference the UserConfig within a ./refereces file. B-A-D.
+  	The reason is the reference module cannot be dependent on user choice.
+  NOTE: We do not need to register ./reference modules. They are now load-on-first-Lookup.
+
+  Continuing with Demand,
+
+    >>> Lookup("Emissions", ("CA", "Agriculture", (2004, 2012, 2020)))
+    (13800000, 1.37E7, 13600000)
+
+  Here's the given capped sectors,
+
+    >>> registerPythonFile("Dataset")    # will register UserConfig
+    >>> cap_trade_mask = Get("Dataset")[Lookup("UserConfig", "Capped Sectors Query")]
+    >>> sectors = Get("Dataset")['Sector'][cap_trade_mask].toSet()
+    {Cement, LCFS, Chemical, Electric}
+    >>> Lookup("Emissions", ("CA", sectors.toArray(), [(2012, 2020)])).sum()   # sum across years
+    (2.375E7, 4.2702E8, 477250.0, 2.633E8)                                     # per sector. Oops
+
+  NOTE: Extend Lookup to allow singleton arrays to be "parallel" to any other array. Use get(i).
+
+  Need to fix LinearFunction interpolator. Found a bug...Integer overflow...
+
+    >>> Variant({2004: 9700000, 2020: 12600000})
+    [LinearFunction: (intercept: -3.53525E8, slope: 181250.0), {2004: 9700000, 2020: 12600000}]
+    >>> Variant.OLS(Variant((2004, 2020)), Variant((9700000, 12600000)))
+    (-3.53525E8, 181250.0)
+
+  OK, back to the emissions per year (not per sector). Need a transpose...got it.
+
+    >>> registerPythonFile("Dataset")    # will register UserConfig
+    >>> cap_trade_mask = Get("Dataset")[Lookup("UserConfig", "Capped Sectors Query")]
+    >>> sectors = Get("Dataset")['Sector'][cap_trade_mask].toSet()
+    {Cement, LCFS, Chemical, Electric}
+    >>> Lookup("Emissions", ("CA", sectors.toArray(), [arange2(2012,9)])).T().sum().cumsum()
+    (3.3872575E8,     6.8208846875E8,  1.03008815625E9, 1.3827248125E9, 1.7399984375E9, 
+     2.10190903125E9, 2.46845659375E9, 2.839641125E9,   3.215462625E9)
+  
+  ...and there's our cumulative demand. 2 or three lines. done. Installed into ModelPrep.py
+
+11/01/2009 --------------------------------------------------------------------------------------
+
+  Let's introduce INDEX type as Integer[]. It's going to follow VECTOR and MASK in spirit.
+
+  NOTE: INDEX * DOUBLE = VECTOR
+
+  Now, run INDEX through it's paces,
+  
+    >>> createIndex(5)                  # [0,0,0,0,0]
+    >>> a = Variant((1,3,2))            # INDEX
+    >>> b = createVector((3,4,5))
+    >>> a * 2                           # [2,6,4]
+    >>> a * 2.0                         # [2.0,6.0,4.0], VECTOR
+    >>> a * createVector((2,3,4))       # [2.0,9.0,8.0], VECTOR
+    >>> a * a                           # [1,9,4]     
+    >>> a ** 3                          # [1,27,8]
+    >>> 3 ** a                          # [3,27,9]
+    >>> a ** a                          # [1,27,4]
+    >>> a ** 0.5                        # [1.0, 1.7320508075688772, 1.4142135623730951]
+    >>> 0.5 ** a                        # [0.5, 0.125, 0.25]
+    >>> a + 3                           # [4,6,5]
+    >>> a + 3.0                         # [4.0, 6.0, 5.0]
+    >>> a + b                           # [4.0, 7.0, 7.0]
+    >>> -a                              # [-1,-3,-2]
+    >>> 2 - a                           # [1,-1,0]
+    >>> b - a                           # [2.0, 1.0, 3.0]
+    >>> b ** a                          # [3.0, 64.0, 25.0]
+    >>> a ** b                          # [1.0, 81.0, 32.0]
+    >>> .5 ** b                         # [0.125, 0.0625, 0.03125]
+    >>> b ** .5                         # [1.7320508075688772, 2.0, 2.23606797749979]
+    >>> 2 ** b                          # [8.0, 16.0, 32.0]
+    >>> a / b                           # [0.3333333333333333, 0.75, 0.4]
+    >>> 1 / a                           # [1.0, 0.3333333333333333, 0.5]
+    >>> b / a                           # [3.0, 1.3333333333333333, 2.5]
+    >>> b / b                           # [1.0, 1.0, 1.0] (ARRAY-live behaviour)
+
+  NOTE: VECTOR/VECTOR now defined to be ARRAY-like.
+
+  TODONE:
+      public Variant(Integer[] x) must create INDEX, not ARRAY.
+
+  NOTE: createMask(INDEX) is ARRAY-like since there is no other nice way to handle this now.
+  	createIndex(MASK) is a sparse MASK as expected.
+
+  ARRAY.get(INDEX) is now possible. It's going to replace/subsume applyArray...
+
+    >>> a = Variant(('a', 4, {'a':4}))
+    >>> b = Variant((1,1,0,2))                 # INDEX
+    >>> a[b]                                   # (4, 4, a, {a: 4})
+    >>> Variant((5,6,7,8,9))[b]                # (6,6,5,7)
+    >>> createMask((1,0,1,1,0,1))[b]           # (F,F,T,T)
+    >>> createIndex(createMask((1,0,1,1,0,1))) # [0, 2, 3, 5]
+    >>> c = Variant(('a','b','c','d'))
+    >>> c[b] = 7                               # (7,7,7,d)
+    
+  OK. That's all fine. Now it's time to take a breath. Now replace lookup() with upgraded get().
+  This means redefining X[ARRAY] to mean lookup(). Check where this is used and update.
+
+11/05/2009 --------------------------------------------------------------------------------------
+
+  Let's work up a simple example for the thesis Proposal,
+
+    >>> P  = Variant(((10,11,12),(7,8,9)))
+    >>> Q  = Variant(((5,6,7),(2,3,4)))
+    >>> d  = createVector((3,0,22))
+    >>> p  = P.toVector()
+    >>> q  = Q.toVector()
+    >>> N  = P.size()
+    >>> T  = P[0].size()
+    >>> A1 = -createSparseMatrix(N*T, N*T, 0)
+    >>> b1 = createVector(N*T)
+    >>> LT = createSparseMatrix(T, T, T)
+    >>> A2 = createSparseMatrixDiagonal(LT * ones(N))
+    >>> b2 = q
+    >>> A3 = -createSparseMatrixHorizontal(LT**2 * ones(N))
+    >>> b3 = -d.cumsum()
+    >>> C = createSparseMatrixDiagonal(createSparseDiagonal(arange(T)[::-1]+1)*ones(N))
+    >>> cost = C * p
+    >>> A = createSparseMatrixVertical([A1,A2,A3])
+    >>> b = createVector([b1,b2,b3])
+    >>> Engine = minimizeLP(cost, A, b)
+    >>> x = createVector(Engine.getX())
+    >>> X = x.reshape((N,T))
+    >>> print "total cost: $" + cost * x
+
+11/19/2009 --------------------------------------------------------------------------------------
+
+  Now we introduce a MarketPricing component. Time to review...
+
+  * We need capacities Q and current prices P  (in ModelEngine2 these are YxN)
+  * There is something called "unmarket" that we should support. These are the 
+    prices we could have responded to. Idempotent?
+  * Market pricing is done on a one-period basis (run Y times) so could be a Java module.
+
+      setMarketPrices(T[y], P[y], P_market[y], P_unmarket[y])
+  def setMarketPrices(t, p, pm, pu, debug=False):
+
+  * Let's work up a new test example
+
+      >>> q = Variant((120, 50, 100, 90, 40, 0))
+      >>> p = Variant((70,  25, 10,  30, 60, 33))
+
+  Now we need to sort one array in terms of the other. Need sort index.
+
+      >>> A = Variant((4,5,3,2))
+      >>> B = A.sort()                       # [2,3,4,5]
+      >>> i = A.isort()                      # [3,2,0,1]
+      >>> r = i.isort()                      # [2,3,1,0] reverse sort
+      >>> A[i]                               # [2,3,4,5]
+      >>> A[A.isort()] == A.sort()           # (T,T,T,T) just to show off a bit.
+      >>> B[r] == A                          # (T,T,T,T) example of reverse sort
+      >>> A.sort()[A.isort().isort()] == A   # (T,T,T,T) another show-off.
+
+  Need Hadamard product for sparse matricies and vectors, for that matter.
+  How do we set a specific diagonal into a SparseMatrix or create one given a set of
+  diagonals...how about we say where the diagonals go with INDEX or ARRAY.
+
+      >>> A = createSparseDiagonals(1, [1,2,3])                        # 4x3 matrix
+      >>> B = createSparseDiagonals((1,-1), [1,2,3])                   # 4x4 matrix
+      >>> C = createSparseDiagonals((-1,0,1), ((1,2),(3,4,5),(6,7)))   # 3x3 matrix
+
+  The issue of shape came up as well especially for testing,
+
+      >>> a = Variant((Variant((1,2,3)), Variant((4,5))))  # ([1,2,3],[4,5])
+      >>> b = a.toArrayDeeply()                            # ((1,2,3),(4,5))
+      >>> a.shape().equals(b.shape())                      # true
+
+  So we can then say (See notes: 11/19/09) Market Pricing for p,
+
+      >>> q   = Variant((120, 50, 100, 90, 40, 0 )) # contains a zero for testing.
+      >>> p   = Variant((70,  25, 10,  30, 60, 33)) # not in order
+      >>> pnz = p[q>0]                              # non-zero quantity
+      >>> qnz = q[q>0]                              # non-zero quantity
+      >>> i   = pnz.isort()                         # sort INDEX
+      >>> r   = i.isort()                           # reverse sort INDEX
+      >>> Q   = qnz[i]                              # Q = Variant((100, 50, 90, 40, 120))
+      >>> P   = pnz[i]                              # P = Variant((10,  25, 30, 60, 70))
+      >>> N   = P.size()
+      >>> A   = hadamard(createSparseMatrix(N,N,1), Q/2)
+      >>> LT  = createSparseMatrix(N,N,N)
+      >>> b   = (LT*Q.toVector() - Q/2)*P*Q
+      >>> B   = createSparseDiagonals((1,0,-1), (-Q[2:],Q[:-1]+Q[1:],-Q[:-1]))
+      >>> I   = createSparseMatrix(N,N,0)
+      >>> A1  = createSparseMatrixVertical((A,-A,B))
+      >>> A2  = createSparseMatrixVertical((-I,-I))
+      >>> AT  = createSparseMatrixHorizontal((A1,A2))
+      >>> bt  = stack((b, -b, createVector(N-1)))
+      >>> qt  = stack((createVector(N), ones(N).toVector()))
+      >>> Engine = minimizeLP(qt, AT, bt)
+      >>> ft     = createVector(Engine.getX())[:N]
+      >>> pt     = ft.diff()/Q                       # (10, 10, 97, 136, 136)
+      >>> p[q>0] = pt[r]                             # careful if p not an INDEX   
+
+  Consider emulating |, & and // for stacking especially of sparse matricies. Not now.
+
+      >>> from MarketPrice import *
+      >>> q = Variant((120, 50, 100, 90, 40, 0 ))
+      >>> p = Variant((70,  25, 10,  30, 60, 33))
+      >>> m = getMarketPrice(p,q)
+
+  TODO: Need to break out INDEX and VECTOR select in applyMask().
+
+  Let's try a "nicer" test case
+
+      >>> from MarketPrice import *
+      >>> q = Variant((100,100))
+      >>> p = Variant((10, 15 ))
+      >>> getMarketPrice(p,q)       # (10,25) if we assume 10 is right then 25 is right. Suspect.
+
+  Oh, shit! The "bowtie" is wrong. The above has zero difference in both Q's. Not best!
+
+11/23/2009 --------------------------------------------------------------------------------------
+
+  Alternative Market Pricing.
+
+  While the "area" of the bowtie is incorrectly calculated since it does not take into account
+  the negative area when a quadralateral is twisted into a "bowtie" this doesn't mean the method
+  is totally wrong. It has reasonable properties. Here is a slight modification,
+
+  Suppose we require, in the absense of non-convexity, that market costs agree when "all" of
+  the assets below any given point are purchased. We could use the "bowtie" code and find that 
+  this cost-coincidence occurs in the middle of each asset rather than at the endpoints
+  with the notable exception of the first asset. Layered on top of this requirement is the
+  convexity requirement which exists to ensure that asset prices retain reletive order after
+  market repricing. The consequence of not doing this is to allow more expensive assets to be
+  purchased before less expensive ones if their artificial market price dictates.
+
+  In the alternative market pricing scheme we have the total market cost fixed (last endpoint).
+  This means that we only need to find N-1 cost points.
+
+  This is now implemented and performs nicely.
+  
+11/24/2009 --------------------------------------------------------------------------------------
+
+  Let's try Yoko's policy stuff. First, make sure outer() works as expected in this case,
+
+    >>> p = Variant(((1,2,3,4),(5,6,7,8),(9,10,11,12)))  # ARRAY
+    >>> y = ones(2)                                      # ARRAY
+    >>> P = outer(y, p)                                  # ARRAY
+
+  Now we need to deal with outer() more. How does it really work? It's incomplete. Needs rewrite.
+
+  For vectors: outer((a,b),(c,d)) ==((ac,ad),(bc,bd)) in RxC format.
+  So, we say for each element in the first vector, we multiply it as a value times the second.
+  Of course, in the case of two vectors, we need to create a sparse matrix (only kind we have)
+  
+12/03/2009 --------------------------------------------------------------------------------------
+
+Getting Glpk running on new machine. See glpk.txt.

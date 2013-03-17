@@ -1,0 +1,8 @@
+#TRF: Setup for RticPHoX development.
+export JAVA_HOME=/usr/lib/jvm/java-6-openjdk
+export JYTHON_HOME=/home/tomf/jython2.5.2
+export COMMONS_HOME=/home/tomf/commons-math-2.2
+export JAVAPLOT_HOME=/home/tomf/JavaPlot-0.4.0
+export PHoX=/home/tomf/sandbox/RticPHoX
+export CLASSPATH=.:$JYTHON_HOME/jython.jar:$PHoX/dist/RticPHoX.jar:/usr/share/java/glpk-java.jar:/usr/share/java/junit.jar:$COMMONS_HOME/commons-math-2.2.jar:$JAVAPLOT_HOME/dist/JavaPlot.jar
+export PATH=$PATH:$JYTHON_HOME:/home/tomf/develop/bin

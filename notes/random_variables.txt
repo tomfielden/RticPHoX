@@ -1,0 +1,3013 @@
+ 7/20/2010 --------------------------------------------------------------------------------------
+				   
+Preamble:
+
+%> cd ~/sandbox/.../PHoX/config
+%> jython
+>>> from Functions import *
+
+Test:
+
+>>> maximizeLP((10,6,4), ((1,1,1), (10,4,5), (2,2,6)), (100,600,300))
+Objective = 733.3333 (33.33333, 66.66666, 0.0)
+
+To get going with RandomVariable we'll bypass Variant for now and just operate directly
+
+>>> import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+>>> r = RandomVariable([1.2, 3.5, 6], [.1,.5,.4])
+>>> r
+((1.2, 3.5, 6.0), (0.1, 0.2, 0.1))
+
+combineDuplicates()
+r = RandomVariable([1, 1], [.1,.5])
+
+abs()
+-3,-2,1,2,4 => 3,2 ! 1,2,4 => 1,2,2,3,4 => 1,2,3,4
+
+An efficient isort would be very beneficial.
+(x,x,x),(y,y,y)
+Comparator given two objects to compare. If we just hand it <double>, <double> we cannot
+recover the isort index info. We need to hand it index info along with the <double>. A pair.
+This means that we must wrap each <double> into an array of Pair<Double,Integer>.
+Then we write our own comparator. The neat part is that we do not need to do much beyond that.
+
+r=RandomVariable([-2, 3, 1, 2], [.3, .1,.5,.4])
+
+Seems so good so far...
+Consider adding some testing...
+About ready for add/subtract/mult/divide understanding the folding into add case.
+
+7/21/2010 ---------------------------------------------------------------------------------------
+
+The abs() function needs work. Still need to split the neg and pos side of the rv. 
+The challenge is that we need to take care with regions that span the origin. We keep zero.
+
+%> jython
+>>> import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+>>> RandomVariable([-2, -1, 2, 3], [.1,.2,.5,.4]).getNegativeSide()
+>>> RandomVariable([-2, -1, 2, 3], [.1,.2,.5,.4]).getPositiveSide()
+>>> a = RandomVariable([1,2,3],[1,2,3])
+>>> b = RandomVariable([4,5,6],[4,5,6])
+>>> c = a+b
+
+7/22/2010 ---------------------------------------------------------------------------------------
+
+%> jython
+>>> import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+>>> a = RandomVariable([1,3],[0.5, 0.5])
+>>> b = RandomVariable([4,5],[1,1])
+>>> c = a+b
+>>> c
+((5.0, 6.0, 7.0, 8.0), (0.0, 0.5, 0.5, 0.0))
+
+>>> a = RandomVariable([1,2],[1,2]).forceUnitProbability()
+>>> b = RandomVariable([2,5],[3,0]).forceUnitProbability()
+>>> c = a+b
+>>> c
+((3.0, 4.333, 5.6667, 7), (0.0, 3.9506, 1.3827, 0.0))
+
+7/29/2010 ---------------------------------------------------------------------------------------
+
+Added FFT.java and Complex.java code I found laying around the web. 
+
+  http://www.cs.princeton.edu/introcs/96optimization/
+  http://www.cs.princeton.edu/introcs/97data/FFT.java.html
+  http://www.cs.princeton.edu/introcs/97data/Complex.java
+  http://www.cs.princeton.edu/introcs/97data/
+
+This Princeton site is really cool. It's all programming in Java.
+
+10/25/2010 --------------------------------------------------------------------------------------
+
+* Created PURandomVariable.java
+* %> jython
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X = RandomVariable((3,4,5),(0,.33,.67))
+  >>> X.plot("filename.txt")
+  >>> X.area()                # should always be 1.0
+  >>> Y = X.exp()
+  >>> Y = X.log()
+  >>> Y = X.sqrt()
+  >>> Y = X.pow(.2)
+
+
+  %> gnuplot
+   > plot "filename.txt" with lines
+
+* Added sort and isort as statics. Did this during the summer in July.
+  >>> idx = RandomVariable.isort((3.2, 5, 3, 1))
+  array('i', [3, 2, 0, 1])
+
+  >>> RandomVariable.sort((3.2, 5, 3, 1), idx)
+  array('d', [1, 3, 3.2, 5])
+
+10/28/2010 --------------------------------------------------------------------------------------
+
+Now have the first code-up of X1+X2. How to test it?
+
+  >>> Y = RandomVariable((4,5,5,6),(0,.5,0,.5))
+  >>> RandomVariable.compress(Y)                     // need this little command.
+  ((4.0, 0.0), (5.0, 0.5), (6.0, 0.5))
+
+  %> jython
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((1,2),(0,1))
+  >>> X2 = RandomVariable((3,4),(0,1))
+  >>> Y = X1 + X2
+  ((4.0, 0.0), (5.0, 0.5), (6.0, 0.5))
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((2,3,5),(0,.25,.75))
+  >>> X2 = RandomVariable((1,4,5),(0,.33,.67))
+  >>> X1 + X2
+  ((3, 0),(4, 0.01375),(6, 0.1375),(7, 0.18),(8, 0.27125),(9, 0.271875),(10, 0.125625))
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> N1 = RandomVariable.createNormalRV(3,2,10)
+
+11/04/2010 --------------------------------------------------------------------------------------
+
+Did a much faster (I hope) code up for binary operations. Almost finished. Testing first part.
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((0,1,2,3),  (.25,.30,.45))
+  >>> X2 = RandomVariable((0,1,2,3,4),(.25,.20,.15,.40))
+  >>> X1 + X2
+  (0.0(0.03125)1.0(0.09375)2.0(0.1675)3.0(0.2225)4.0(0.21125)5.0(0.18375)6.0(0.09)7.0)
+
+Now for the hard stuff,
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> N1 = RandomVariable.createNormalRV(5,3,100)
+  >>> N2 = RandomVariable.createNormalRV(2,1,100)
+  >>> Y = N1 + N2
+  >>> Y.plot("Y")
+
+  >>> X1 = RandomVariable((0,2),(1,0))
+  >>> X2 = RandomVariable((0,1),(1,0))
+  
+11/05/2010 --------------------------------------------------------------------------------------
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((0,1,2,3),  (.25,.30,.45))
+  >>> X2 = RandomVariable((0,1,2,3,4),(.25,.20,.15,.40))
+  >>> X1 * X2
+
+11/06/2010 --------------------------------------------------------------------------------------
+
+Needed to test the cases, here we go...
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((0,1),(1,0))
+  >>> X2 = RandomVariable((1,2),(1,0))
+  >>> X1 * X1
+  >>> X1 * X2
+  >>> X2 * X1
+  >>> X2 * X2
+
+These all work. Next is to handle the (-,-), (-,+) and (+,-) cases.
+
+11/08/2010 --------------------------------------------------------------------------------------
+
+There's some pre-work to do. 
+1) Allow handling of Null RV's
+2) create getGreaterThan(.) and getLessThan(.) for building cases --> Updated: use split(.);
+3) create join(X1, X2) for putting things back together.
+4) create neg(X1)
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((-3,-1,1,3),(.2,.5,.3))
+  >>> X1.getGreaterThan(0)
+  (0.0(0.25)1.0(0.3)3.0)
+  >>> X1.getLessThan(0)
+  (-3.0(0.2)-1.0(0.25)0.0)
+  >>> X1.getProbability(0,2)
+  0.4
+  >>> X2 = RandomVariable((-4,-2,1,3,4),(.1,.3,.4,.2))
+  >>> RandomVariable.join(X1, X2)
+  (-4.0(0.05)-3.0(0.15)-2.0(0.2)-1.0(0.7)1.0(0.7)3.0(0.2)4.0)
+  >>> X2.neg()
+  (-4.0(0.2)-3.0(0.4)-1.0(0.3)2.0(0.1)4.0)
+
+To multiply:
+  split each X1 and X2 into <= 0 and >= 0. 
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((-3,-1,1,3),(.2,.5,.3))
+  >>> X2 = RandomVariable((-4,-2,1,3,4),(.1,.3,.4,.2))
+  >>> Y = X1 * X2
+(-12(0.02628)-7.68(0.0149567)-6.75(0.056143)-4.32(0.05793)-3.0(0.069)-1.92(0.12041)-0.75(0.04013)-0.48(0.095191)-0.0(0.09519)0.48(0.040445)0.75(0.12204)1.92(0.07459)3.0(0.068002)4.32(0.06641291)6.75(0.02092)7.68(0.032397)12.0)
+  >>> N1 = RandomVariable.createNormalRV(5,3,100)
+  >>> N2 = RandomVariable.createNormalRV(0,1,100)
+  >>> Y = N1 * N2
+  >>> N1.plot("N1")
+  >>> N2.plot("N2")
+  >>> Y.plot("Y")
+
+11/09/2010 --------------------------------------------------------------------------------------
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+
+  >>> X1 = RandomVariable((-3,-1,1,3),(.2,.5,.3))
+  >>> X2 = RandomVariable((-4,-2,1,3,4),(.1,.3,.4,.2))
+  >>> Y = X1 * X2
+  >>> N1 = RandomVariable.createNormalRV(5,3,100)
+  >>> N2 = RandomVariable.createNormalRV(1,1,100)
+  >>> Y = N1 * N2
+  >>> X3 = RandomVariable((-1,-5.842548667089886E-15, 1), (.5, .5))
+  >>> X1 = RandomVariable((0,1,3),(.3,.7))
+  >>> X2 = RandomVariable((0,1,3,4),(.1,.5,.4))
+  >>> Y = X1 * X2
+  >>> N1 = RandomVariable.createNormalRV(25,3,100)
+  >>> N2 = RandomVariable.createNormalRV(4,1,100)
+  >>> Y = N1 * N2
+
+  >>> X1 = RandomVariable((-3,-1,1,3),(.2,.5,.3))
+  >>> X1.reciprocal()
+  >>> X1 = RandomVariable((-3,-1,0,3),(.2,.5,.3))
+  >>> X1.reciprocal()
+
+There's a improper gap near 0 in the following:
+  >>> N1 = RandomVariable.createNormalRV(10,3,25)
+  >>> N2 = RandomVariable.createNormalRV(1 ,1,25)
+  >>> Y = N1 * N2
+
+Try this test case
+  >>> X1 = RandomVariable((0,.01,1),(.5,.5))
+  >>> X2 = RandomVariable((0,1),(1,0))
+  >>> Y = X1 * X2
+
+11/10/2010 --------------------------------------------------------------------------------------
+
+  Totally revamp multiplication and addition processing.
+
+  >>> import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+  >>> X1 = RandomVariable((0,1,2),(.5,.5))
+  >>> Y = X1 * X1
+  >>> N1 = RandomVariable.createNormalRV(5,3,1000)
+  >>> N2 = RandomVariable.createNormalRV(1,1,1000)
+  >>> Y = N1 * N2
+  >>> X1 = RandomVariable((-1,0,1),(.5,.5))
+  >>> Y = X1 + X1
+
+11/11/2010 --------------------------------------------------------------------------------------
+
+*) create li(x) w/ test routine. Use Simpsons' Rule to interpolate.
+*) implement x1^x2 (pow) module.
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,.5),(1,))
+Y = X1**X1
+(0.0(0.17099892046518017)0.5(0.8290010795348198)1.0)
+X1 = RandomVariable((0,.2,1),(.7,.3))
+Y = X1**X1
+(0.0(0.10859046786285417)0.25(0.10326513521135633)0.5(0.23150219333)0.75(0.5566422036)1.0)
+X1 = RandomVariable((0,.2,.7,1),(.4,.5,.1))
+X2 = RandomVariable((0,.7,1),(.5,.5))
+Y = X1**X2
+
+// breakdown into cases
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X10 = RandomVariable((0,1),(1,))
+X11 = RandomVariable((1,2),(1,))
+X20 = RandomVariable((-1,0),(1,))
+X21 = RandomVariable(( 0,1),(1,))
+Y00 = X10**X20
+Y01 = X10**X21
+Y10 = X11**X20
+Y11 = X11**X21
+
+// was failing to join, but now has NaN probability.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,.2,.7,1.5),(.4,.5,.1))
+X2 = RandomVariable((-1,-.5,-.2,3),(.2,.5,.3))
+Y = X1**X2
+
+X10 = RandomVariable((0,.2,.7,1),(.2,.3,.5))
+X11 = RandomVariable((1,1.5),(1,))
+X20 = RandomVariable((-1,-.5,-.2,0),(.2,.3,.5,))
+X21 = RandomVariable((0,3),(1,))
+Y00 = X10**X20
+Y01 = X10**X21
+Y10 = X11**X20
+Y11 = X11**X21
+
+X1 = RandomVariable((0,2),(1,))
+X2 = RandomVariable((-2,2),(1,))
+Y = X1**X2
+
+// Stress test
+N1 = RandomVariable.createNormalRV(10,3,1000)
+N2 = RandomVariable.createNormalRV(.7,.1,1000)
+Y = N1 ** N2
+
+11/12/2010 --------------------------------------------------------------------------------------
+
+// let's try out a simple quadratic curve fitter
+##################################################################
+from pylab import *
+# sample points. assume x=(-1,0,1,2) ~ (0.9996,.9997,.9998,.9999)
+y = array([-7.2470303526,-7.53466242216,-7.94007752818,-8.63317470749])  
+
+yo = y[1]
+y1 = y[2]
+vo = y[1]-y[0]
+vm = y[2]-y[1]
+v1 = y[3]-y[2]
+vo = 0.5*vo+0.5*vm
+v1 = 0.5*vm+0.5*v1
+ao = yo
+a1 = vo
+a3 = v1+vo - 2*(y1-yo)
+a2 = y1-yo-vo-a3
+
+def f(x):
+    return a3*x*x*x + a2*x*x + a1*x + ao
+
+x = linspace(-1,2,100)
+z = linspace(-1,2,100)
+
+for i in range(100):
+    z[i] = f(x[i])
+
+plot(x/10000+0.9997,z)
+plot(array([0.9996,0.9997,0.9998,0.9999]),y)
+show()
+################################################
+
+// try the SplineFit()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable.test_spline("spline")
+
+* The spline thing does not outperform Simpons Rule. It also seems to have no positive effect.
+
+## Recreate the Unit Catastrophe
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(1.1,.1,100)
+N2 = RandomVariable.createNormalRV(.5,.1,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+## Still failing with NaN near INFINITY...
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,.2,.7,1.5),(.4,.5,.1))
+X2 = RandomVariable((-1,-.5,-.2,3),(.2,.5,.3))
+Y = X1**X2
+
+11/13/2010 --------------------------------------------------------------------------------------
+
+Euler-Masceroni Constant:
+  0.57721 56649 01532 86060 65120 90082 40243 10421 59335 93992
+
+Developed Ei(x) in Python. It's pretty fast. Could do it in Java rather than use a table!
+
+11/15/2010 --------------------------------------------------------------------------------------
+
+Developed Ei(x) in Java. Try to figure out the number of terms needed.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable.Ei.getEi(1.E-50,1) # -114.55203898480076
+RandomVariable.Ei.getEi(1.E-10,1) # -22.448635264938925
+RandomVariable.Ei.getEi(1.E-8,1)  # -17.843465069050833  # cut-off for single term
+RandomVariable.Ei.getEi(1.E-7,2)  # -15.540879886056784
+RandomVariable.Ei.getEi(1,16)     # 1.8951178163559366
+RandomVariable.Ei.getEi(2,23)     # 4.954234356001891
+RandomVariable.Ei.getEi(5,31)     # 40.18527535580318
+RandomVariable.Ei.getEi(10,45)    # 2492.228976241878
+RandomVariable.Ei.getEi(20,65)    # 25615652.664056566
+RandomVariable.Ei.getEi(100,190)  # 2.7155527448538797E+41
+RandomVariable.Ei.getEi(200)      # 3.63123524415935685238E+84  # we can't quite get this.
+
+Empirically we find,
+>>>
+def n(x):
+    return 1.5625*(1+1./(5*x+5))*(x+1-100)+189
+
+x=linspace(0,100,201)
+plot([0,1,2,5,10,20,100],[1,16,23,31,45,65,190])
+plot(x,n(x))
+show()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((1,2,3),(.5, .5))
+X2 = RandomVariable((0,1,2),(.5, .5))
+Y = X1 ** X2
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(3,.1,100)
+N2 = RandomVariable.createNormalRV(1.1,.1,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### This is a nice looking one
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.5,.09,100)
+N2 = RandomVariable.createNormalRV(1.1,.1,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### Now we have a funky effect in this picture.
+### Several copies of 1. A missing case? Also, they're sliced pretty thin near 1.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(1.1,.1,10)
+N2 = RandomVariable.createNormalRV(1.1,.3,10)
+Y = N1 ** N2
+Y.plot("Y")
+
+## Recreate the Near Unit Catastrophe -- Good example.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(1.1,.1,100)
+N2 = RandomVariable.createNormalRV(1.1,.2,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(1.7,.1,100)
+N2 = RandomVariable.createNormalRV(1.1,.1,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### This is the the Thin Vertical Catastrophe. See if split can help.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((1.0,1.0000000000000002), (1,))
+X2 = RandomVariable((1,1.01),(1,))
+Y = X1 ** X2
+Y.plot("Y")
+
+### Split seems to blame. Here's a test case,
+>>>
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((0,1.000000000000002),(1,)).split(1)
+### should be: (0.0(1.0)1.0)(null)
+RandomVariable((0,1.000000000000002,2),(.5,.5)).split(1)
+
+
+### Not yet handling infinity in pow().
+
+11/16/2010 --------------------------------------------------------------------------------------
+
+### Test the partition
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable.JointRV.getLinearPartition((1,2,3),3,5)
+
+### Test slice()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((1,2,3,4),(.1,.2,.3)).slice(1,3)
+
+### Test trim()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((1,1,1,2,3,4,4,5),(.2,.1,.2,0,.3,.1,0)).trim()
+# (1.0(0.5)2.0(0.0)3.0(0.4)4.0)
+
+### Test split()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((-2,-1,1,2),(.1,.1,.1)).split(0)
+RandomVariable((-2,-1,1,2),(.1,.1,.1)).split(1)
+RandomVariable((0,1,2),(.5,.5,)).reciprocal().split(1)
+# (0.5(0.5)1.0)(1.0(0.5)Infinity)
+RandomVariable((-1,0,1,2),(.2,.3,.5,)).reciprocal().split(1)
+# (-Infinity(0.2)-1.0(0.0)0.5(0.5)1.0)(1.0(0.3)Infinity)
+
+### Test partition()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((0,1,2),(.5, .5)).reciprocal().partition(6)
+
+*** There's more to do to support INFTY. We need to change how we search for affected
+cells and how we integrate cells. It's all fairly straight forward, but it's always a 
+special case.
+
+11/17/2010 --------------------------------------------------------------------------------------
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,2),(1,))
+X2 = RandomVariable((0,1,3),(1,1,))
+RandomVariable.join2(X1,X2)
+# (0.0(0.5)1.0(1.0)2.0(0.5)3.0)
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,4,6,7,8),  (4,2,1,1))
+X2 = RandomVariable((1,2,3,6,7,9),(1,1,3,1,2))
+RandomVariable.join2(X1,X2)
+# (0.0(1.0)1.0(2.0)2.0(2.0)3.0(2.0)4.0(4.0)6.0(2.0)7.0(2.0)8.0(1.0)9.0)
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((-.5,0,.5),(1,1)).reciprocal()
+X2 = RandomVariable((-1,1),(1,))
+RandomVariable.join2(X1,X2)
+
+### This one's interesting except for a zero at the end FIXED.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(1.1,.2,100)
+N2 = RandomVariable.createNormalRV(1.1,.5,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+*** Rebuilt join() as join2() and it seems to be working beautifully. 
+    Not fully tested yet. There are 12 cases to capture.
+
+11/18/2010 --------------------------------------------------------------------------------------
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,.5,1),(.5,.5)).reciprocal()
+X2 = RandomVariable((1,2),(1,))
+Y = X1**X2
+
+11/19/2010 --------------------------------------------------------------------------------------
+
+### Every quadrant contains some jitters.
+### Y0p has a spike at zero: (0.0(1.1013812839922186E-5)9.303716850764959E-7), INFTY miscount?
+### Y0n has a spike at one : (1.0(8.978781502017228E-5)1.000234634883112). Jittery.
+### Y1n has a spike at one. Like a mirror image of Y0n.
+### Y1p is fairly well behaved. Jittery near 1. Partition too small?
+### This shows some significant numerical difficulties.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.8,.2,100)
+N2 = RandomVariable.createNormalRV(1.1,.5,100)
+Y = N1 ** N2
+Y.plot("Y")
+### NOTICE: If we change N1 to this, we find a new feature?!
+N1 = RandomVariable.createNormalRV(.8,.15,100)
+
+### This is the the Thin Vertical Catastrophe.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((1.0,1.00000000000002), (1,))
+X2 = RandomVariable((1,1.01),(1,))
+Y = X1 ** X2
+
+### Is the join() working properly?
+
+### Why is there a non-monotonicity? A transposition? A missed cell?
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(100000,2000,100)
+N2 = RandomVariable.createNormalRV(.8,.1,100)
+### Can even scale it down to 3 or 4. This works,
+N1 = RandomVariable.createNormalRV(100000,2000,5)
+N2 = RandomVariable.createNormalRV(.8,.1,5)
+### How about,
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((94,98,102,106),(.002, .182,.816))
+X2 = RandomVariable((.5,.7,.9,1.1),(.002,.182,.816))
+Y = X1 ** X2
+
+11/20/2010 --------------------------------------------------------------------------------------
+
+Now we're talking. The pow() is working very nicely indeed!
+Let's try another case,
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((1,  1.002,1.004,1.006),(.2,  .3,  .5))
+X2 = RandomVariable((0.8,0.9,  1.0,  1.1),  (.333,.333,.334))
+Y = X1 ** X2
+Y.plot("Y")
+
+###Interested in this case, a quantization error? A quantization/partition effect?
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.9,.1,20)
+N2 = RandomVariable.createNormalRV(1.1,.05,1000)
+Y = N1 ** N2
+Y.plot("Y")
+
+### Here's an old favorite
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(1.1,.2,100)
+N2 = RandomVariable.createNormalRV(1.1,.5,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+11/22/2010 --------------------------------------------------------------------------------------
+
+Time to revisit additiona and multiplication. 
+Will now do double Max(N,M) sampling with 2x average-down-sampling. 
+
+NOTE: We should handle +/-INFTY separately from the main arrays.
+NOTE: Can't use m_N anymore, must use size().
+
+split()
+join()
+
+### Test our simple operations 
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((1,2,3),(10,11)).right_rotate()
+RandomVariable((1,2,3,4),(10,11,12)).right_rotate()
+RandomVariable((1,2,3),(10,11)).left_rotate()
+RandomVariable((1,2,3,4),(10,11,12)).left_rotate()
+RandomVariable((1,2,3),(10,11)).append(4,12)
+RandomVariable((2,3,4),(11,12)).prepend(1,10)
+
+### Test reciprocal and associates
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+RandomVariable((-.5,0,.5),(1,1)).reciprocal()
+RandomVariable((-.5,0,.5),(1,1)).reciprocal().reciprocal().reciprocal().reciprocal() # ORIG
+RandomVariable((1,2,3),(10,11)).reciprocal()
+RandomVariable((-3,-2,-1),(10,11)).reciprocal()
+RandomVariable((0,.25,.5,1),(1,2,3)).reciprocal() 
+RandomVariable((1,2,3,4,5),(10,11,12,13)).slice(1,-1)
+RandomVariable((1,2,3),(10,11)).split(0)
+
+### Test join2()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,2),(2,))
+X2 = RandomVariable((0,1,3),(1,2,))
+RandomVariable.join2(X1,X2)
+# (0.0(2.0)1.0(2.0)2.0(1.0)3.0)
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,4,6,7,8),  (4,2,1,1))
+X2 = RandomVariable((1,2,3,6,7,9),(1,1,3,1,2))
+RandomVariable.join2(X1,X2)
+# (0.0(1.0)1.0(2.0)2.0(2.0)3.0(2.0)4.0(4.0)6.0(2.0)7.0(2.0)8.0(1.0)9.0)
+
+### NOTE: This is now a possiblity of having N==1 values since they're bounded by infinity.
+
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+XN = RandomVariable((-.5, 0),(1,)).reciprocal()
+XP = RandomVariable((0  ,.5),(1,)).reciprocal()
+RandomVariable.join2(XN,XP)
+X1 = RandomVariable((-.5,0,.5),(1,1)).reciprocal()
+X2 = RandomVariable((-1,1),(1,))
+RandomVariable.join2(X1,X2)
+
+### Here's stressful case -- Working.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.8,.2,100)  # was 100 points
+N2 = RandomVariable.createNormalRV(1.1,.5,100) # was 100 points
+Y = N1 ** N2
+Y.plot("Y")
+
+### Walk it along
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.8,.2,100)  # was 100 points
+N2 = RandomVariable.createNormalRV(1.1,.5,100) # was 100 points
+N1np = N1.split(1)
+N2np = N2.split(0)
+N1p  = N1np.getY()
+N1n  = N1np.getX().split(0).getY().reciprocal()
+N2p  = N2np.getY()
+N2n  = N2np.getX().neg()
+Ynp  = N1n**N2p            ### 
+Ynn  = N1n**N2n            ### 
+Ypp  = N1p**N2p            ### Simple decay
+Ypn  = N1p**N2n            ### Simple decay
+
+### Now go back and make sure multiplication still works.
+
+### NOTICE: Zero-Catastrophe!
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.8,1,100)  # was 100 points
+N2 = RandomVariable.createNormalRV(1.1,.5,100) # was 100 points
+Y = N1 * N2
+Y.plot("Y")
+
+### Addition again.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(.8,1,100)  # was 100 points
+N2 = RandomVariable.createNormalRV(1.1,.5,100) # was 100 points
+Y = N1 + N2
+Y.plot("Y")
+
+### Division
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(20,1,100)  # was 100 points
+N2 = RandomVariable.createNormalRV(10,1,100) # was 100 points
+Y = N1 * N2.reciprocal()
+Y.plot("Y")
+
+11/23/2010 --------------------------------------------------------------------------------------
+
+Let's get the other operations up and running. Then we can work on parition limiter.
+
+### neg()
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+-RandomVariable((-1,0,2,4),(10,11,12)).reciprocal() 
+# (-Infinity(11.0)-0.5(12.0)0.25(0.0)1.0(10.0)Infinity)
+
+### X + d, d + X
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+5 + RandomVariable((-1,0,2,4),(10,11,12))
+
+### X1 - X2, X1 - 3, 3 - X1
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+3 - RandomVariable((-1,0,2,4),(10,11,12))
+N1 = RandomVariable.createNormalRV(30,1,100)
+N2 = RandomVariable.createNormalRV(10,5,100)
+Y = N1 - N2
+N1.plot("N1")
+N2.plot("N2")
+Y.plot("Y")
+
+### X1 * X2, X1 * d, -d * X1
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+-3 * RandomVariable((-1,0,2,4),(10,11,12))
+Y = RandomVariable.createNormalRV(10,5,100) * (-2)
+Y.plot("Y")
+N1 = RandomVariable.createNormalRV(30,1,100)
+N2 = RandomVariable.createNormalRV(10,5,100)
+Y = N1 * N2
+N1.plot("N1")
+N2.plot("N2")
+Y.plot("Y")
+
+### X1 / d, d / X1
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+4 / RandomVariable((-1,0,2,4),(10,11,12))
+Y = RandomVariable.createNormalRV(10,5,100) / (-2)
+Y.plot("Y")
+
+### X1 / X2 -- messed up around zero. Fixed.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(30,1,100)
+N2 = RandomVariable.createNormalRV(10,5,100)
+Y = N1 / N2
+N1.plot("N1")
+N2.plot("N2")
+Y.plot("Y")
+
+### X / X -- A "Nan" Party. Fixed.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable.createNormalRV(10,5,100)
+X2 = X1.reciprocal()
+Y = X1 * X2
+Y.plot("Y")
+
+### X/X simplified
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((-1,1,2),(2,1))
+X2 = X1.reciprocal()
+#X1 = X1.split(0).getX()
+#X2 = X2.split(0).getY()
+Y = X1 * X2
+Y.plot("Y")
+
+### This is the culprit.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X = RandomVariable((0,.04,.08,.16,.32,.64,.72,1.0,2),(10,20,30,40,50,60,70,80))
+X.neg()
+
+### X1 / X1 -- messed up around zero. Fixed. COOL.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(0,1,100)
+N2 = 1/N1
+Y = N1 / N1
+N1.plot("N1")
+N2.plot("N2")
+Y.plot("Y")
+
+### Test the basic element of NPV --- ERROR: setHorizontalLimits ran out of steps. FIXED
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.createNormalRV(25000,2000,100)
+N2 = RandomVariable.createNormalRV(.2,0.3,100)
+N3 = RandomVariable.createNormalRV(1,.01,100)
+X  = N1/(1+N2)
+#X = X.split(1).getY()  ## remedy, FIXED
+Y = X**N3
+Y.plot("Y")
+
+### Even this fails: ERROR: setHorizontalLimits ran out of steps. FIXED
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,1),(1,))
+X2 = RandomVariable((-2,-1,0),(.5,.5)) 
+Y = X1**X2
+Y.plot("Y")
+
+### Fails even harder...Now produces Y=(1(0)1(0)1(0)1(1)Infinity) FIXED
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable((0,1),(1,)).reciprocal()
+X2 = RandomVariable((1,2),(1,))
+Y = X1**X2
+
+
+##### Simple Net Present Value ############  Error: All p = 0. FIXED.
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+P = -100000
+R = 25000
+r = .1
+NPV = P
+for t in range(10):
+     N1 = RandomVariable.createNormalRV(R,2000+300*(t+1),100)
+     N2 = RandomVariable.createNormalRV(r + .1*t,0.2+0.1*t,100)
+     N3 = RandomVariable.createNormalRV(1,.01,100)
+     NPV += N1/(1+N2)**((t+1)*N3)
+     #NPV.plot(str("Y"+str(t+1)))
+
+NPV.plot("Y")
+
+gnuplot>
+plot "Y1" with lines,"Y2" with lines,"Y3"with lines,"Y4" with lines,"Y5" with lines,"Y6" with lines
+
+11/24/2010 --------------------------------------------------------------------------------------
+
+* Want to fix Normal so that E() and Var() work properly. OK.
+* Want some new functions:
+   Pr(a,b), PrGT(b), PrLT(a)  # Probabilities that include INFTY
+   Mix(X1, X2)                # really just join2()
+   Median(), Percentile(p)
+   CI(p)                      # confidence interval at some pct level
+
+* Want Log-Normal distribution - means getting exp() to work.
+* Want DataReduction through curve fitting. Relegate the draconian POINT_LIMIT to last-ditch.
+
+Try out cern's Colt library
+>>>
+import cern.jet.stat.Probability.normal as normal
+normal(0,1,0)
+## .5         # as expected
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+Y = RandomVariable.Normal(5,2,1000)
+Y.plot("Y")
+Y.PrGT(5)  # .5
+Y.PrLT(5)  # .5
+from cern.jet.stat.Probability import *
+z = normalInverse(0.9)
+Y.PrLT(z*2+5)
+
+### Test Mix(.)
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+X1 = RandomVariable.Normal(0,1,1000)
+X2 = RandomVariable.Normal(5,2,1000)
+Y  = RandomVariable.Mix(X1, X2, .2, .8)
+Y.plot("Y")
+Z = Y.Reduce(5)
+Z.plot("Z")
+
+### Test Percentile(p)
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+from cern.jet.stat.Probability import *
+Z = RandomVariable.Normal(0,1,1000)
+Z.Percentile(0.9)
+normalInverse(0.9)   # equal up to <= 4 decimals
+
+11/26/2010 --------------------------------------------------------------------------------------
+
+Upgrade from continuous to mixed (w/ discrete) distribution. POSTPONED.
+
+11/27/2010 --------------------------------------------------------------------------------------
+
+Let's survey what features we'd like in a DoubleArray. Do we already have these in 
+java.util.DoubleArray?
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.DoubleArray as DoubleArray
+a = DoubleArray((0,1,2,3,4))
+a.getIndexOf(2.1)
+
+import com.carbonmodelinggroup.PHoX.util.ProbabilityArray as ProbabilityArray
+P = ProbabilityArray((0,1,2,3,4),(10,20,30,40),(100,200,300,400,500))
+P.getProbability(0,4)
+P.getProbability(4,5)
+P.getProbability(1,1)
+P.PrLTE(2)
+
+P = ProbabilityArray((0,),(10,),(100,))
+P.getProbability(0,4)
+P.getProbability(-2,-1)
+
+P = ProbabilityArray.createDiscreteDistribution((0,),(100,))
+P.getProbability(0,0)
+
+11/29/2010 --------------------------------------------------------------------------------------
+
+Decided to represent probability elements in a linked list.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+P.setNegInf(2)
+P.setPosInf(5)
+Q = ProbabilityList.createContinuous((4,5,6),(10,20))
+S = ProbabilityList.join(P.scale(.5/P.P()),Q.scale(.5/Q.P()))  ### Our mix function!
+ProbabilityList.join(P,Q)
+R = ProbabilityList.createContinuous((1.5,2,3.5),(50,150))
+ProbabilityList.join(P,R)
+
+Still need to do,
+* split()       -- may best live at RandomVariable level
+* reciprocal()
+* reverse()     -- may not need. too simple.
+* reduce()
+* the math ops  -- need access functions
+* partition()   -- doesn't really need an update, just use x()
+* plot()
+
+11/30/2010 --------------------------------------------------------------------------------------
+
+* split(). Must respect interval. Must bisect node. Return an array of two ProbabilityLists.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+#P.setNegInf(2)
+#P.setPosInf(5)
+Q = ProbabilityList.createContinuous((4,5,6),(10,20))
+R = ProbabilityList.join(P,Q)
+R.split(2.1)
+R.split(4.5)
+R.split(4)
+R.split(6)
+
+NOTE: Added: Apache-Commons-Math (jar)
+>>>
+import org.apache.commons.math.distribution.NormalDistributionImpl as Normal
+N = Normal()
+N.cumulativeProbability(0)  # P(X <= 0) == 0.5
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N = ProbabilityList.Normal(0,1,100)
+N.plot("Y")
+
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+Q = ProbabilityList.createContinuous((4,5,6),(10,20))
+R = ProbabilityList.join(P,Q)
+R.plot("Y")
+
+S = ProbabilityList.join(N, P)
+S.plot("Y")
+
+N = ProbabilityList.Normal(4,2,500)
+S = ProbabilityList.join(N.scale(.75), P.scale(.25/P.P()))
+S.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+P.setNegInf(2)
+P.setPosInf(5)
+Q = ProbabilityList.createContinuous((4,5,6),(10,20))
+R = ProbabilityList.join(P,Q)
+R.reverse()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+Q = ProbabilityList.createContinuous((0,.5,1,4),(10,20,30))
+Q.reciprocal().reciprocal()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+Q = ProbabilityList.createContinuous((-5,-1,-.5,0),(10,20,30))
+Q.setNegInf(40)
+Q.reciprocal()
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+P.reciprocal()
+P = ProbabilityList.createDiscrete((-2,),(10,))
+P.setNegInf(20)
+P.reciprocal().reciprocal()
+P = ProbabilityList.createDiscrete((2,),(10,))
+P.setPosInf(20)
+P.reciprocal().reciprocal()
+N = ProbabilityList.Normal(4,2,500)
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+S = ProbabilityList.join(N.scale(.75), P.scale(.25/P.P()))
+M = S.reciprocal().reciprocal()
+S.plot("Y")
+M.plot("Z")
+
+12/1/2010 --------------------------------------------------------------------------------------
+
+TODO:
+* neg()       # Done
+* log()       # Done
+* exp()       # Done
+* sqrt()      # Done
+* sq()        # Done
+* pow()       # Done
+* reduce()    # Done
+* partition() # Done
+* Ei()        # Done
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+Q = ProbabilityList.createContinuous((-5,-1,-.5,0,2),(10,20,30,40))
+Q.neg()
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+P.neg()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N = ProbabilityList.Normal(4,2,500)
+Z = N.exp()
+Y = Z.log()
+Z.plot("Z")
+Y.plot("Y")
+N = ProbabilityList.Normal(40,2,500)
+Z = N.log()
+Y = Z.exp()
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+P.log().exp()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N = ProbabilityList.Normal(4,2,500)
+Y = N.sq()
+Z = Y.sqrt()
+ProbabilityList.Normal(6,2,500).sq().plot("Y")
+Y = ProbabilityList.Normal(6,2,500).sqrt()
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N = ProbabilityList.Normal(4,2,500)
+Y = N.pow(1.5)
+Y.plot("Y")
+N = ProbabilityList.Normal(20,2,500)
+Y = N.pow(-1.5)
+Z = Y.pow(-2/3.)
+Y.plot("Y")
+Z.plot("Z")
+N.plot("N")
+
+NOTICE: If we have a repeated node (3(2)3) then we really have (3<2>).
+
+* reduce() is a simple algorithm that should work by integer input. So that,
+  reduce(2) combines adjacent pairs.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createDiscrete((1,2,3),(10,20,30))
+Q = P.regularize(4)
+N = ProbabilityList.Normal(4,2,100)
+M = N.regularize(527)
+N.plot("N")
+M.plot("M")
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createContinuous((1,2,3),(10,20))
+Q = P.regularize(4)
+N = ProbabilityList.Normal(20,2,500)
+Y = N.pow(-1.5)
+Z = Y.regularize(127)
+Y.plot("Y")
+Z.plot("Z")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createDiscrete((1,2,3,4,5),(10,20,30,40,50))
+#P.reduce(2)
+P.reduce(27)  # (1<50),5<150>)
+
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createContinuous((1,2,3,4,5),(10,20,30,40))
+P.reduce(2)   # (1(30)3(70)5)
+
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+Y = ProbabilityList.Normal(20,2,500).pow(-1.5)
+Z = Y.reduce(5)
+Y.plot("Y")
+Z.plot("Z")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = ProbabilityList.createContinuous((1,2,5),(10,20))
+P.partition(10)
+
+12/2/2010 --------------------------------------------------------------------------------------
+
+TODO:
+* JointRV -- need to upgrade to handle discrete probability  # Done
+* binary: add, sub, mult, div, pow                           # Done
+
+In order to capture probability correctly I need to capture 4 cases not just 1. 
+In mixed-mode random variables we can have Discrete and Continuous.
+
+We realize: Discrete   * Discrete   => Discrete    DD => D
+            Discrete   * Continuous => Continuous  DC => C
+	    Continuous * Discrete   => Continuous  CD => C
+	    Continuous * Continuous => Continuous  CC => C
+
+The DD case involves summing discrete lattice-point probability into partitions.
+The DC and CD cases involve computing probability over horizontal or vertical edges respectively
+The CC case involves computing area.
+
+The situation may be purely DD or purely CD, etc. Each case involves a p-2array which overlays
+the x-2array
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable((1,2),(1,))
+X2 = RandomVariable((3,4),(1,))
+Y = X1 + X2
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createContinuous((1,2),(1,))
+X2 = ProbabilityList.createContinuous((3,4),(1,))
+Y = X1 + X2
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable((2,3,5),(.25,.75))
+X2 = RandomVariable((1,4,5),(.33,.67))
+X1 + X2
+# (3.0(0.037675)4.6(0.138375)6.2(0.31285)7.6(0.3344)8.8(0.1767)10.0)
+
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createContinuous((2,3,5),(.25,.75))
+X2 = ProbabilityList.createContinuous((1,4,5),(.33,.67))
+X1 + X2
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(0,1,1000)
+N2 = ProbabilityList.Normal(1,5,1000)
+Y = N1 + N2
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(0,1,1000)
+N2 = ProbabilityList.Normal(1,5,1000)
+Y = N1 * N2
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(1,5,1000)
+N2 = ProbabilityList.Normal(0,1,1000)
+Y = N1 / N2
+Y.plot("Y")
+
+N1 = ProbabilityList.Normal(10,5,1000)
+N2 = N1.reciprocal()
+Y = N1 * N2
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(.8,.2,100)
+N2 = ProbabilityList.Normal(1.1,.5,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### Here's an old favorite
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(1.1,.2,100)
+N2 = ProbabilityList.Normal(1.1,.5,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### This is a nice looking one. OOPS. Fixed: Mishandled null-case.
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(.5,.09,100)
+N2 = ProbabilityList.Normal(1.1,.1,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### Unit Catastrophe. 
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+N1 = ProbabilityList.Normal(1.1,.1,100)
+N2 = ProbabilityList.Normal(.5,.1,100)
+Y = N1 ** N2
+Y.plot("Y")
+
+### NPV
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+P = -100000
+R = 25000
+r = .1
+NPV = P
+for t in range(10):
+     N1 = ProbabilityList.Normal(R,2000+300*(t+1),100)
+     N2 = ProbabilityList.Normal(r + .1*t,0.2+0.1*t,100)
+     N3 = ProbabilityList.Normal(1,.01,100)
+     NPV += N1/(1+N2)**((t+1)*N3)
+
+NPV.plot("Y")
+
+12/3/2010 --------------------------------------------------------------------------------------
+
+* Want to improve the sampling efficiency for the Normal. Will sample y-axis.
+  Here's some python code to help check things out,
+
+>>>
+from pylab import *
+yo = 1/sqrt(2*pi)
+W = 8  # standard deviations to stop at
+yW = 1/sqrt(2*pi)*exp(-W**2/2)
+y = linspace(yo, yW, 10)
+x = sqrt(-2*log(sqrt(2*pi)*y))
+plot(x,y)
+show()
+
+* It really skimps on the tail from s=3 to s=8: no data! This is not good. 
+  I think I should leave well enough alone.
+  The fact is: the Normal is not *that* steep that we have to pepper the side with samples.
+
+* Let's get serious.
+
+TODO:
+* implement DD -- Discrete   * Discrete   = Discrete    ...DONE
+* implement CD -- Continuous * Discrete   = Continuous
+* implement DC -- Discrete   * Continuous = Continuous
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((1,2,3), (10,20,30))
+X2 = ProbabilityList.createDiscrete((4,5,6), (40,50,60))
+X1 + X2
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.Poisson(10,100)
+X1.plot("Y")
+
+>>> search limits issue: FIXED
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.Poisson(.2)
+X2 = ProbabilityList.Poisson(20)
+Y = X1 * X2
+
+>>> NEED TO CATCH THE ZERO's. FIXED
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((0,),(1,))
+X2 = ProbabilityList.createDiscrete((1,2,3),(.25,.25,.5))
+Y = X1 * X2
+
+>>> Singleton Zero issue: FIXED
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((0,),(1,))
+X2 = ProbabilityList.createDiscrete((1,2,3),(.25,.25,.5))
+Y = X1 + X2
+
+>>> X1 ** 0
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((1,2,3),(.25,.25,.5))
+X2 = ProbabilityList.createDiscrete((0,),(1,))
+Y = X1 ** X2
+
+>>> X1 ** 1/2
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((1,2,3),(.25,.25,.5))
+X2 = ProbabilityList.createDiscrete((.5,),(1,))
+Y = X1 ** X2
+
+>>> 2 ** X2
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((2,),(1,))
+X2 = ProbabilityList.createDiscrete((1,2,3),(.25,.25,.5))
+Y = X1 ** X2
+
+>>> 1 ** X2
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((1,),(1,))
+X2 = ProbabilityList.createDiscrete((1,2,3),(.25,.25,.5))
+Y = X1 ** X2
+
+>>> 1 ** N
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((1,),(1,))
+N  = ProbabilityList.Normal(.5,.09,100)
+Y = X1 ** N
+
+>>> 2 ** N
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((2,),(1,))
+N  = ProbabilityList.Normal(0,1,100)
+Y = X1 ** N
+
+>>> .5 ** N
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((.5,),(1,))
+N  = ProbabilityList.Normal(0,1,100)
+Y = X1 ** N
+
+>>> 0 * N
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((0,),(1,))
+N  = ProbabilityList.Normal(0,1,100)
+Y = X1 * N
+
+>>> 2 * N
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((2,),(1,))
+N  = ProbabilityList.Normal(0,1,100)
+Y = X1 * N
+
+>>> 2 / N -- Loses a significant amount of probability: Not hangling INFINITY... FIXED
+import com.carbonmodelinggroup.PHoX.util.ProbabilityList as ProbabilityList
+X1 = ProbabilityList.createDiscrete((2,),(1,))
+N  = ProbabilityList.Normal(0,1,1000)
+Y = X1 / N
+
+TODO:
+* implement CD -- Continuous * Discrete   = Continuous
+* implement DC -- Discrete   * Continuous = Continuous
+
+12/5/2010 --------------------------------------------------------------------------------------
+
+Let's test RandomVariable one last time before it becomes PURandomVariable
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.PURandomVariable as RandomVariable
+N1 = RandomVariable.Normal(25000,2000,100)
+N2 = RandomVariable.Normal(.2,0.3,100)
+N3 = RandomVariable.Normal(1,.01,100)
+X  = N1/(1+N2)
+Y = X**N3
+Y.plot("Y")
+
+* RandomVariable is now overwritten (back) to PURandomVariable.
+* Will create new RandomVariable in it's place based on some new ideas.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))
+Y = RandomVariable.ContinuousRandomVariable((1,2,3),(10,20))
+X.xp()
+Y.xp()
+X.P()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))
+Y = X.scale(2)
+### Notice: scale(double) is (almost) copied between Discrete and Continuous and cannot be shared
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.DiscreteRandomVariable.Poisson(2)
+X.plot("X")
+X.neg()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))
+X.setNegInf(1)
+X.setPosInf(2)
+X.split(0)
+X.split(1)
+X.split(2)
+X.split(2.5)
+X.split(3)
+X.split(4)
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.DiscreteRandomVariable()
+X = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))
+X.setNegInf(1)
+X.setPosInf(2)
+X01 = X.split(2)
+X0 = X01[0]
+X1 = X01[1]
+RandomVariable.DiscreteRandomVariable.join(X0,X1)
+RandomVariable.DiscreteRandomVariable.join(X0,X)
+RandomVariable.DiscreteRandomVariable.join(X0,N)
+
+N = RandomVariable.DiscreteRandomVariable()
+N.setNegInf(1)
+N.setPosInf(2)
+
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.DiscreteRandomVariable((-2,-1,-.25,0,.25,1,2),(10,20,30,40,50,60,70))
+X.setNegInf(1)
+X.setPosInf(2)
+X.reciprocal()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.DiscreteRandomVariable.Poisson(15)
+#X.setNegInf(1)
+#X.setPosInf(2)
+Y = X.reciprocal()
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.DiscreteRandomVariable()
+X = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))	
+X.setPosInf(2)
+X.add(4)
+X.rsub(4)
+X.multiply(-2)
+X.multiply(0)
+X.multiply(3)
+X.divide(0)
+Y = RandomVariable.DiscreteRandomVariable.Poisson(12)
+Z = Y.divide(-12)
+Z.plot("Z")
+Z = Y.rdivide(2)
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))	
+B = RandomVariable.DiscreteRandomVariable((4,5,6,7),(10,20,30,40))	
+Y = RandomVariable.DiscreteRandomVariable.add(A,B)
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.DiscreteRandomVariable.Poisson(12)
+B = RandomVariable.DiscreteRandomVariable.Poisson(2)
+Y = RandomVariable.DiscreteRandomVariable.multiply(A,B)
+Y = RandomVariable.DiscreteRandomVariable.divide(A,B)
+Z = RandomVariable.DiscreteRandomVariable.divide(B,A)
+X = RandomVariable.DiscreteRandomVariable.multiply(Y,Z)
+Y.plot("Y")
+
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.DiscreteRandomVariable.Poisson(12)
+X = RandomVariable.DiscreteRandomVariable.multiply(A,A)
+Y = RandomVariable.DiscreteRandomVariable.divide(X,X)
+
+### A datapoint reduction scheme seems clear. Threshold reduction. 
+    Some datapoints have very little probability and should be automatically tossed.
+    Capture their adjacent quantity and split the result with adjacent materialized nodes.
+
+12/06/2010 --------------------------------------------------------------------------------------
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.ContinuousRandomVariable((0,4,7),(10,20))
+B = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))	
+C = RandomVariable.ContinuousRandomVariable.multiply(A,B)
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(0,1,500)
+X2 = RandomVariable.DiscreteRandomVariable((1,5,10),(.2,.3,.5))
+Y  = RandomVariable.ContinuousRandomVariable.add(X1,X2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(0,1,500)
+X2 = RandomVariable.DiscreteRandomVariable((1,5,10),(.2,.3,.5))
+Y  = RandomVariable.ContinuousRandomVariable.sub(X1,X2)
+Y.plot("Y")
+Z  = RandomVariable.ContinuousRandomVariable.sub(X2,X1)
+Z.plot("Z")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+X2 = RandomVariable.DiscreteRandomVariable((1,5,10),(.2,.3,.5))
+Y  = RandomVariable.ContinuousRandomVariable.multiply(X1,X2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+X2 = RandomVariable.DiscreteRandomVariable.Poisson(5)
+Y  = RandomVariable.ContinuousRandomVariable.multiply(X1,X2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.ContinuousRandomVariable((0,4,7),(10,20))
+B = RandomVariable.DiscreteRandomVariable((1,),(1,))
+RandomVariable.ContinuousRandomVariable.sub(A,B)
+RandomVariable.ContinuousRandomVariable.sub(B,A)
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.ContinuousRandomVariable((0,4,7),(.3,.7))
+B = RandomVariable.DiscreteRandomVariable((-1,0,2,),(.2,.3,.5,))
+C = RandomVariable.ContinuousRandomVariable.multiply(A,B)
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+B = RandomVariable.DiscreteRandomVariable((-1,0,2,),(.2,.3,.5,))
+Y = RandomVariable.ContinuousRandomVariable.multiply(X1,B)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+B = RandomVariable.DiscreteRandomVariable((-1,0,2,),(.2,.3,.5,))
+Y = RandomVariable.ContinuousRandomVariable.divide(X1,B)
+Z = RandomVariable.ContinuousRandomVariable.divide(B,X1)
+Y.plot("Y")
+Z.plot("Z")
+
+12/07/2010 --------------------------------------------------------------------------------------
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X1 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+B = RandomVariable.DiscreteRandomVariable((-1,0,2,),(.2,.3,.5,))
+Y = RandomVariable.ContinuousRandomVariable.divide(X1,B)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+D = RandomVariable.DiscreteRandomVariable((-1,0,2,),(10,20,30))
+D.setNegInf(2)
+D.setPosInf(5)
+D.negative_zero_positive()
+
+RandomVariable.DiscreteRandomVariable((-1,1,2,),(10,20,30)).negative_zero_positive()
+RandomVariable.DiscreteRandomVariable(( 0,1,2,),(10,20,30)).negative_zero_positive()
+RandomVariable.DiscreteRandomVariable(( 1,2,3,),(10,20,30)).negative_zero_positive()
+RandomVariable.DiscreteRandomVariable().negative_zero_positive()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+Z = N.exp()
+Y = Z.log()
+Z.plot("Z")
+Y.plot("Y")
+N = RandomVariable.ContinuousRandomVariable.Normal(40,2,500)
+Z = N.log()
+Y = Z.exp()
+Y.plot("Y")
+P = RandomVariable.DiscreteRandomVariable((1,2,3),(10,20,30))
+P.log().exp()  ### NOT YET IMPLEMENTED
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+Y = N.sq()
+Z = Y.sqrt()
+Y.plot("Y")
+Z.plot("Z")
+RandomVariable.ContinuousRandomVariable.Normal(6,2,500).sq().plot("Y")
+Y = RandomVariable.ContinuousRandomVariable.Normal(6,2,500).sqrt()
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+Y = N.pow(1.5)
+Y.plot("Y")
+N = RandomVariable.ContinuousRandomVariable.Normal(20,2,500)
+Y = N.pow(-1.5)
+Z = Y.pow(-2/3.)
+Y.plot("Y")
+Z.plot("Z")
+N.plot("N")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+N2 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+Y  = RandomVariable.ContinuousRandomVariable.add(N1, N2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+N2 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+Y  = RandomVariable.ContinuousRandomVariable.sub(N1, N2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+N2 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+Y  = RandomVariable.ContinuousRandomVariable.multiply(N1, N2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+N2 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+Y  = RandomVariable.ContinuousRandomVariable.divide(N1, N2)
+Y.plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.ContinuousRandomVariable.Normal(4,2,500)
+N2 = RandomVariable.ContinuousRandomVariable.Normal(1,1,500)
+Y  = RandomVariable.ContinuousRandomVariable.pow(N1, N2)
+Y.split(0)[1].split(4)[0].plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Discrete((1,2,3),(10,20,30))
+X.Discrete().P()
+X.P()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Poisson(5)
+Y = RandomVariable.Normal(0,1,100)
+X.neg()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+RandomVariable.Continuous((-1, 1),(1,)).Continuous().neg_pos_P()
+RandomVariable.Continuous((-1, 0),(1,)).Continuous().neg_pos_P()
+RandomVariable.Continuous(( 0, 1),(1,)).Continuous().neg_pos_P()
+RandomVariable.Continuous((-2,-1),(1,)).Continuous().neg_pos_P()
+RandomVariable.Continuous(( 1, 2),(1,)).Continuous().neg_pos_P()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Poisson(5)
+X.neg().Discrete().plot("X")
+X.reciprocal().Discrete().plot("X")
+X.log().Discrete().plot("X")
+X.exp().Discrete().plot("X")
+X.sqrt().Discrete().plot("X")
+X.pow(2).Discrete().plot("X")
+X.pow(.5).Discrete().plot("X")
+X.pow(1.5).Discrete().plot("X")
+X.rpow(2).Discrete().plot("X")
+X.rpow(.5).Discrete().plot("X")   ## NOT YET HANDLED
+X.rpow(1.5).Discrete().plot("X")
+Y = RandomVariable.Normal(0,1,100)
+Y.neg().Continuous().plot("Y")
+Y.reciprocal().Continuous().plot("Y")
+Y.log().Continuous().plot("Y")
+Y.exp().Continuous().plot("Y")
+Y.sqrt().Continuous().plot("Y")
+Y.pow(2).Continuous().plot("Y")
+Y.pow(.5).Continuous().plot("Y")
+Y.pow(1.5).Continuous().plot("Y")
+Y.rpow(2).Continuous().plot("Y")
+Y.rpow(.5).Continuous().plot("Y")   ## NOT YET HANDLED
+Y.rpow(1.5).Continuous().plot("Y")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.DiscreteRandomVariable((1,),(.5,))
+B = RandomVariable.ContinuousRandomVariable((3,4),(.5,))
+C = RandomVariable.DiscreteRandomVariable((2,),(.25,))
+D = RandomVariable.ContinuousRandomVariable((7,11),(.75,))
+X = RandomVariable.createNoCopy(A, B)
+Y = RandomVariable.createNoCopy(C, D)
+Z = X + Y
+Z.Discrete()
+Z.Continuous()
+Z = X - Y
+Z.Discrete()
+Z.Continuous()
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Discrete((1,),(.5,))
+B = RandomVariable.Continuous((1,2),(.5,))
+C = RandomVariable(A.Discrete(), B.Continuous())
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Poisson(5)
+Y = RandomVariable.Normal(0,1,100)
+X.plot("X")
+Y.plot("Y")
+Z = RandomVariable(X.scale(.7), Y.scale(.3))    # decent mixer
+Z.plot("Z")
+
+12/08/2010 --------------------------------------------------------------------------------------
+
+>>> ISSUE: losing some probability. FIXED: PROBABILITY_TOL set too high
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Normal(1,1,500)
+B = RandomVariable.Discrete((1,),(1,))
+Y = A*B
+Y.plot("Y")
+
+>>> First mixed-mode random variable result!
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Normal(1,1,500)
+B = RandomVariable.Discrete((-1,0,2,),(.2,.3,.5,))
+Y = A*B
+Y.plot("Y")
+
+>>> ISSUE: probability is NaN. FIXED.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Normal(1,1,500)
+A.Continuous().reciprocal().P()
+
+>>> Fully test ContinuousRandomVariable.split()
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(-1)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(0)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(.5)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(1)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(1.5)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(2)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).split(3)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(0)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(.5)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(.75)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(1)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(2)
+
+>>> test our reciprocal(). losing probability. Fixed.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.ContinuousRandomVariable.Normal(0,1,500)
+X.plot("X")
+Y = X.reciprocal()
+Y.plot("Y")
+Z = Y.reciprocal()
+Z.plot("Z")
+
+>>> test our reciprocal(). OK.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+B = RandomVariable.Discrete((-1,0,2,),(.2,.3,.5,))
+B.reciprocal()
+
+### Need to handle INFINITY in multiply case. Fails in divide() case.
+
+>>> Missing .3 of probability. FIXED.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Normal(1,1,500)
+B = RandomVariable.Discrete((-1,0,2,),(.2,.3,.5,))
+Y = A/B
+Y.plot("Y")
+
+>>> Y.negInf == nan. FIXED.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Normal(1,1,500)
+X = A.reciprocal()
+B = RandomVariable.Discrete((1,),(1,))
+Y = X*B
+Y.plot("Y")
+
+>>> Has P() == nan. FIXED
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Normal(1,1,500)
+B = RandomVariable.Discrete((-1,0,2,),(.2,.3,.5,))
+Y = B/A
+Y.plot("Y")
+
+>>> test. DONE.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Continuous((-1,1),(10,))
+A.Continuous().setNegInf(20)
+A.Continuous().setPosInf(30)
+B = RandomVariable.Discrete((2,),(1,))
+A*B
+
+12/09/2010 --------------------------------------------------------------------------------------
+
+* pow() time. Need pow(Discrete, Discrete) first.
+* ofe() -- [odd, fractional, even] splitter for discrete.
+
+>>> Test odd_fractional_even() .OBSOLETE.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+D = RandomVariable.DiscreteRandomVariable((-3,-2,-1,0,1,.5,.7,2,3),(1,2,3,4,5,6,7,8,9))
+OFE = D.odd_fractional_even()
+OFE[0]
+OFE[1]
+OFE[2]
+
+>>> test pow(DD)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.DiscreteRandomVariable((2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((3,),(1,))
+
+Anzp   = A.negative_zero_positive()
+Bnzp   = B.negative_zero_positive()
+An     = Anzp[0]
+Az     = Anzp[1]
+Ap     = Anzp[2]
+Bn     = Bnzp[0]
+Bz     = Bnzp[1]
+Bp     = Bnzp[2]
+Bnp    = RandomVariable.DiscreteRandomVariable.join(Bn, Bp)
+#Bnpofe = Bnp.odd_fractional_even()
+#Bnpoe  = RandomVariable.DiscreteRandomVariable.join(Bnpofe[0], Bnpofe[2])
+
+>>> test pow(DD)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.DiscreteRandomVariable((2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((3,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+RandomVariable.DiscreteRandomVariable.pow(A,3)
+A = RandomVariable.DiscreteRandomVariable((2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-3,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+RandomVariable.DiscreteRandomVariable.pow(A,-3)
+A = RandomVariable.DiscreteRandomVariable((-2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((3,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+RandomVariable.DiscreteRandomVariable.pow(A,3)
+A = RandomVariable.DiscreteRandomVariable((-2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-3,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+RandomVariable.DiscreteRandomVariable.pow(A,-3)
+A = RandomVariable.DiscreteRandomVariable((0,),(1,))
+B = RandomVariable.DiscreteRandomVariable((3,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((0,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((0,),(1,))
+B = RandomVariable.DiscreteRandomVariable((0,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.1,.1,.1,.1,.1,.1,.4))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.1,.1,.1,.1,.1,.1,.4))
+B = RandomVariable.DiscreteRandomVariable((0,),(1,))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-1,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-.5,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((0,),(1,))  #ERR. FIXED.
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((.25,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((1,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((3,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-2,-1,-.5,0,.25,1,3),(.4,.1,.1,.1,.1,.1,.1))
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable()
+B = RandomVariable.DiscreteRandomVariable()
+A.setPosInf(.2)
+A.setNegInf(.8)
+B.setPosInf(.4)
+B.setNegInf(.6)
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable()
+A.setNegInf(1)
+B = RandomVariable.DiscreteRandomVariable((-1,0,1),(.2,.2,.2))
+B.setNegInf(.2)
+B.setPosInf(.2)
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-1,0,1),(.2,.2,.2))
+B.setNegInf(.2)
+B.setPosInf(.2)
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable((-1,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-1,0,1),(.2,.2,.2))
+B.setNegInf(.2)
+B.setPosInf(.2)
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable(( 0,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-1,0,1),(.2,.2,.2))
+B.setNegInf(.2)
+B.setPosInf(.2)
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable(( 2,),(1,))
+B = RandomVariable.DiscreteRandomVariable((-1,0,1),(.2,.2,.2))
+B.setNegInf(.2)
+B.setPosInf(.2)
+RandomVariable.DiscreteRandomVariable.pow(A,B)
+A = RandomVariable.DiscreteRandomVariable.Poisson(10)
+B = RandomVariable.DiscreteRandomVariable.Poisson(5)
+C = B.reciprocal()
+Y = RandomVariable.DiscreteRandomVariable.pow(A,C)
+Y.plot("Y")
+
+12/10/2010 --------------------------------------------------------------------------------------
+
+* pow(CD) & pow(DC)
+* Need to update the mixer to be accessible separately from the operation.
+* Update:
+	private static ContinuousRandomVariable operate(ContinuousRandomVariable A,
+							DiscreteRandomVariable B, 
+							OP_CASE op_case) {
+  * Added cases POW and RPOW for CD and DC within ContinuousRandom Variable
+    need C.pow(d), C.rpow(d)
+
+>>> Test C.pow(d)
+gnuplot> 
+set yrange[0:1]; set xrange[-10:10]
+
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.ContinuousRandomVariable.Normal(1,1,1000)
+A.pow(1).plot("N")
+A.pow(0.9).plot("X")
+A.pow(1.1).plot("Y")
+A.pow(.49).plot("X")
+A.pow(.5).plot("Y")
+A.pow(.51).plot("Z")
+A.pow(.4).plot("X")
+A.pow(.5).plot("Y")
+A.pow(.6).plot("Z")
+A.pow(4).plot("Y")
+A.pow(-4).plot("Y")
+A.pow(3).plot("Y")
+
+>>> test C.rpow(d)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.ContinuousRandomVariable.Normal(.1,1,1000)
+X = N.rpow(2)
+X.plot("X")
+Y = N.rpow(.5)
+Y.plot("Y")
+Z = N.rpow(-.5)
+Z.plot("Z")
+K = N.rpow(-2)
+K.plot("K")
+
+>>> d^C wild case  
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.ContinuousRandomVariable.Normal(.1,1,1000)
+Y = N.reciprocal().rpow(.5)
+Y.plot("Y")
+
+gnuplot> 
+set yrange[0:1]; set xrange[0:10]
+plot "Y" with lines
+
+>>> test C^D
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.Normal(1,1,1000)
+D = RandomVariable.Discrete((-1.5, 0, 0.9, 1.5),(.1, .1, .2,.6))
+Y = C ** D
+Y.plot("Y")
+C.plot("C")
+
+>>> test D^C
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+D = RandomVariable.Discrete((-1.5, 0, 0.9, 1.5),(.1, .1, .2,.6))
+C = RandomVariable.Normal(1,1,1000)
+Y = D ** C
+Y.plot("Y")
+C.plot("C")
+
+12/11/2010 --------------------------------------------------------------------------------------
+
+The convention for handling (x<0)^y => (-x)^y * cos(x/pi)  (i.e. Real part)
+TODO: Fix D^d, and everything else involving pos() or rpow().
+
+Notice: if    z         = x^y
+        then  ln(z)     = y*ln(x)
+	and   ln(ln(z)) = ln(y)+ln(ln(x))
+
+Notice:     ^                
+	    |               ln(2) > 0, ln(.5) < 0
+	|   |   |
+	|   |   |
+   -----1---0---1------> x
+        |   |   |
+	|   |   |
+	    |  
+
+12/13/2010 --------------------------------------------------------------------------------------
+
+* The first thing is to get D^D running properly with the new Real(.) convention. DONE.
+* Then we can do D^C and C^D as proper RandomVariables.
+* Finally we'll update C^C using the existing base method. Save ln(x2)+ln(ln(x1)) for later.
+* Remember to set the min partition size.
+
+>>> test: public double[] rpow_neg_limits(double d, double c1, double c2) 
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+RandomVariable.ContinuousRandomVariable.rpow_neg_limits(-2, -.2, -.1)
+RandomVariable.ContinuousRandomVariable.rpow_neg_limits(-2, -.2, 2.1)
+
+gnuplot> 
+set yrange[0:2]; set xrange[-10:10]
+
+>>> test: C.rpow(-d)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.ContinuousRandomVariable((-.2,-.1,0,.1,.5),(.1,.2,.3,.4))
+C.rpow(-2)
+N = RandomVariable.ContinuousRandomVariable.Normal(0,1,100)
+Y = N.rpow(-2)
+Y = N.rpow(-1)
+Y.plot("Y")
+
+12/14/2010 --------------------------------------------------------------------------------------
+
+Support (-1)^C, but not sure why it's not uniform. Should it be?
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.ContinuousRandomVariable((0,5,10,15,20,25),(.2,.2,.2,.2,.2,))
+Y = X.rpow(-1.1)
+Y = X.rpow(-1)
+Y.plot("Y")
+
+>>> These are cool
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.ContinuousRandomVariable.Normal(0,10,10000)
+Y = N.rpow(-0.95)
+Y.plot("Y")
+Y = N.rpow(-1.01)
+Y.plot("Y")
+
+gnuplot> 
+set yrange[0:2]; set xrange[-10:10]
+
+>>> Let's check out C^C, just to make sure it's working. It is.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Normal(10, 1,500)
+Y = RandomVariable.Normal(.8,.02,500)
+Z = X**Y
+Z.plot("Z")
+
+* Let's handle the special cases and do D^C and C^D.
+* Notice (+C)^C, but not (-C)^C
+
+* First do X^d
+	public ContinuousRandomVariable pow(double d) {
+	    // ASSUME: d != 0, d != +/-INFINITY, 
+	    // IF      d == N/2 THEN only non-negative portion survives, other is lost.
+  * capture X^{0,+-I} -> Discrete
+  * capture -(X^N/2)  -> Discrete
+
+>>> D^0
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+D = RandomVariable.Discrete((-1.5, 0, 0.9, 1.5),(.1, .1, .2,.6))
+D.pow(0)
+
+	public ContinuousRandomVariable rpow(double d) {
+	    // ASSUME: d != {0, +1, +-I}
+
+>>> test X^d, d^X
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+D = RandomVariable.Discrete((-2, -1, -.5, 0, .5, 1, 2),(.1, .1, .1,.1,.1,.1,.1))
+D.Discrete().setNegInf(.15)
+D.Discrete().setPosInf(.15)
+D**-2
+D**-1
+D**-.5
+D**0
+D**.5
+D**1
+D**2
+(-2)**D
+(-1)**D
+(-.5)**D
+0**D
+.5**D
+1**D
+2**D
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.Continuous((-3,3),(.8,))
+C.Continuous().setNegInf(.1)
+C.Continuous().setPosInf(.1)
+C**-2
+C**-1
+C**-.5
+C**0
+C**.5
+C**1
+C**2
+(-2)**C  # oops. lost +-I .FIXED.
+(-1)**C
+(-.5)**C
+0**C
+.5**C    # oops. too much I .FIXED.
+1**C
+1.5**C   
+2**C 
+
+>>> The sequence N^d would be great for an animation.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+(N**-.5).plot("Y")
+
+* Now address C^D
+
+    public static RandomVariable pow(ContinuousRandomVariable A, DiscreteRandomVariable B) {
+	// Special cases: A^{0, +-I}. 
+	// Notice: (-I,I)^0                   = 1
+	//         (-I,-1)(-1,1)(1,I)^I       = (+-Ic)(  0 )(I)
+	//         (-I,-1)(-1,0)(0,1)(1,I)^-I = (  0 )(+-Ic)(I)(0)
+
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.ContinuousRandomVariable((-2,2),(1,))
+C.pow(-2)  # not working FIXED.
+# NOTICE:
+X = C.reciprocal()
+# (-Infinity(0.5),-0.5,0.5,Infinity(0.5))  # CORRECT
+X.split(0)
+# (-Infinity(0.5),-0.5,0.0,)               # WRONG. Should not have 0.0
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(1)
+RandomVariable.ContinuousRandomVariable((0,1,2),(10,20)).reciprocal().split(2)
+
+>>> Test C^D
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.Normal(0,1,10)
+D = RandomVariable.Discrete((-2,),(1,))
+(C**D).P() # P < 1, dammit, but C**-2 works...should add###Inf, not set###INF .FIXED.
+D = RandomVariable.Discrete((-1,),(1,))
+(C**D).P()
+
+>>> Here's an uugly one. It works!
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.Normal(0,1,1000)
+D = RandomVariable.Discrete((-2,-1.4,-1,-.5,-.2,0,.2,.5,1.4,2),(.1,.1,.1,.1,.1,.1,.1,.1,.1,.1,))
+Y = C**D
+Y.plot("Y")
+Y = D**C
+Y.plot("Y")
+
+C/0 FIXED.
+
+FUNCTIONALLY COMPLETE?????????????????????????????????????????????????????
+
+>>> These are cool
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,10,10000)
+Y = (-0.95)**N
+Y.plot("Y")
+Y = (-1.01)**N
+Y.plot("Y")
+
+
+gnuplot> 
+set yrange[0:1.2]; set xrange[-3:3]
+
+>>> The sequence N^d would be great for an animation.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+(N**-.5).plot("Y")
+
+12/15/2010 --------------------------------------------------------------------------------------
+
+* Two tasks today. 
+  1) Build in well-known distributions.
+  2) Script-based animation generation.
+
+* Continuous Distributions
+  1) Beta            DONE
+  2) Cauchy          DONE
+  3) Chi-square      DONE
+  4) Exponential     DONE
+  5) F               DONE
+  6) Gamma
+  7) Normal          DONE
+  8) T
+  9) Weibull
+
+* Discrete Distributions
+  1) Binomial
+  2) Hypergeometric
+  3) Integer
+  4) Pascal
+  5) Poisson        DONE
+  6) Zipf
+
+>>> test Beta
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+RandomVariable.Beta(.5,.5,1000).plot("Y")
+
+>>> test Cauchy
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+Y = RandomVariable.Cauchy(0,1,1000)
+Y.plot("Y")
+
+>>> test ChiSquared
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+Y = RandomVariable.ChiSquared(1,1000)
+Y.plot("Y")
+
+>>> test Exponential
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+Y = RandomVariable.Exponential(1,1000)
+Y.plot("Y")
+
+12/16/2010 --------------------------------------------------------------------------------------
+
+Animation.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+import os
+import subprocess
+
+name = "Y"
+i = 7
+
+s = """
+set terminal png
+set output "%s%03d.png"
+set yrange[0:1.2]; set xrange[0:100]
+plot "%s" with lines
+""" % (name, i, name)
+
+fp = open("plot.txt", 'w')
+fp.write(s)
+fp.close()
+p = subprocess.Popen(["gnuplot", "plot.txt"])
+
+# sts = os.waitpid(p.pid, 0)
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+>>> test F
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+RandomVariable.F(1,1,1000).plot("Y")
+
+gnuplot> 
+set yrange[0:1.2]; set xrange[-3:3]
+
+>>> The sequence N^d would be great for an animation.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+(N**-.5).plot("Y")
+
+## To animate:
+   * We need to decide what the parameterized formula is (done)
+   * we need a sequence of parameters.
+   * we need to decide on the camera framing (xrange, yrange)
+   * titling
+
+%>
+animate -delay 20 frame1.gif frame2.gif frame3.gif -loop 0
+convert -delay 20 frame1.gif frame2.gif frame3.gif -loop 0 playme.gif
+
+%>
+convert -delay 20 *.png -loop 0 animate.gif
+
+DONE.
+
+12/17/2010 --------------------------------------------------------------------------------------
+
+Created $PHoX/animation directory with "animation_XXX.jy" files sequentially numbered.
+
+12/19/2010 --------------------------------------------------------------------------------------
+
+Created NewRandomVariable with id-codes for class correlation.
+
+Q) What is the ID code issuance policy?
+A) ID codes are inherited by default.
+
+NEW: nodes for doubly-linked ring.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.NewRandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+(N**-.5).plot("Y")
+
+NB: continuousProper() is INCOMPLETE 
+
+>>> Some intersting shots for the New Orleans paper. MULTIPLY
+import com.carbonmodelinggroup.PHoX.util.NewRandomVariable as RandomVariable
+N = RandomVariable.Normal(1,1,500)
+M = RandomVariable.Normal(5,3,500)
+(N*M).plot("Y")
+
+>gnuplot
+set terminal png
+set output 'multiply.png'
+set xrange [-15:25]
+set yrange [0:.25]
+plot "Y" with lines title "N(5,3) * N(1,1)"
+
+>latex
+\begin{center}\includegraphics[width=60mm]{multiply}\end{center}
+
+>>> DIVIDE
+import com.carbonmodelinggroup.PHoX.util.NewRandomVariable as RandomVariable
+N = RandomVariable.Normal(1,1,500)
+M = RandomVariable.Normal(5,3,500)
+(M/N).plot("Y")
+
+>gnuplot
+set terminal png
+set output 'divide.png'
+set xrange [-20:30]
+set yrange [0:.12]
+plot "Y" with lines title "N(5,3) / N(1,1)"
+
+>>> ADD (Oops. FAILS with NewRandomVariable)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,.25,500)
+X = RandomVariable.Discrete((0,1),(.3,.7))
+Y = N+X
+Y.plot("Y")
+
+>gnuplot
+set terminal png
+set output 'add.png'
+set xrange [-1:2]
+set yrange [0:1.2]
+plot "Y" with lines title "N(0,.25) + {(0,1)~(.3,.7)}"
+set terminal wxt
+
+>>> d^C
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Normal(0,5,10000)
+Y = (-1.01)**X
+Y.plot("Y")
+
+>gnuplot
+set terminal png
+set output 'd_C.png'
+set xrange [-1.2:1.2]
+set yrange [0:8]
+plot "Y" with lines title "(-1.01) ^ N(0,5)"
+set terminal wxt
+
+>>> C^d WARNING: This is lopsided and it wasn't before...
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Normal(0,1,500)
+Y = X**0.9
+Z = X**1.1
+X.plot("X")
+Y.plot("Y")
+Z.plot("Z")
+
+>gnuplot
+set terminal png
+set output 'C_d.png'
+set xrange [-4:4]
+set yrange [0:.7]
+plot "X" with lines title "N(0,1)", "Y" with lines title "N(0,1)^0.9", "Z" with lines title "N(0,1)^1.1"
+set terminal wxt
+
+>>> C_D
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+C = RandomVariable.Normal(0,1,1000)
+D = RandomVariable.Discrete((-2,-1.4,-1,-.5,-.2,0,.2,.5,1.4,2),(.1,.1,.1,.1,.1,.1,.1,.1,.1,.1,))
+Y = C**D
+Y.plot("Y")
+
+>gnuplot
+set terminal png
+set output 'C_D.png'
+set xrange [-3:3]
+set yrange [0:.8]
+plot "Y" with lines title "N(0,1)^(-2,-1.4,-1,-.5,-.2,0,.2,.5,1.4,2)"
+set terminal wxt
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+P = -100000
+R = 25000
+r = .1
+NPV = P
+for t in range(6):
+     N1 = RandomVariable.Normal(R,2000+300*(t+1),1000)
+     N2 = RandomVariable.Normal(r + .1*t,0.2+0.1*t,1000)
+     N3 = RandomVariable.Normal(1,.01,1000)
+     NPV += N1/(1+N2)**((t+1)*N3)
+
+NPV.plot("Y")
+
+>gnuplot
+set terminal png
+set output 'NPV.png'
+set xrange [-100000:100000]
+set yrange [0:1.1e-5]
+plot "Y" with lines title "Net Present Value"
+set terminal wxt
+
+12/21/2010 --------------------------------------------------------------------------------------
+
+* Started next generation RandomVariable in PHoX.random.*
+
+>>> Works out-of-the-box! 
+import com.carbonmodelinggroup.PHoX.random.RandomVariableImpl as RandomVariable
+N = RandomVariable.Normal(1,1,500)
+M = RandomVariable.Normal(5,3,500)
+(M/N).plot("Y")
+
+To implement the Executive option with lazy evaluation we need to build a couple of interfaces.
+The first is RandomVariable and the current object we call RandomVariable will become
+EmpiricalRandVariable. 
+We will also build a TreeNode interface. This will allow all the different kinds of objects
+live in the same tree stucture without actually being random variables. Such as...none.
+OK, forget that. RandomVariable isa tree node.
+
+We need a RandomVariableFactory to produce different types of RandomVariables
+The Normal isa EmpiricalRandomVariable -> RandomVariableImpl
+
+12/22/2010 --------------------------------------------------------------------------------------
+
+New concepts:
+1) RandomVariables are associated with tree nodes as "satellite" data.
+2) Tree nodes  are agents of random variables and implement their interface.
+3) Tree nodes implement rich operations: (2*), (^1.3), etc. are valid nodes. 
+   Notice these singleton nodes propagate the class of thier one child node.
+4) (Empirical) Random Variables are immutable. Once rendered they never change. No re-render.
+5) New tree nodes are creating in respectful fashion. They understand class and operation type.
+6) Two flavors of binary operators "correlated" and "independent" detected at Eval().
+7) A Random Variable may contain a "proper" version of itself for display or indep. operations.
+
+*) Recall that RandomVariables of the same class have the same rvnodes modulo x-values. 
+Q) Where is concept of "class" carried? By the agent or the RandomVariable itself?
+A) Let's say Tree Node!
+
+>>> 
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+A = Factory.Discrete((1,2),(.1,.2))
+A.log()
+A.exp().log()
+(A * 3)*2
+(A / 2)*4
+
+12/23/2010 --------------------------------------------------------------------------------------
+
+Q) Should we handle rational coefficients?
+A) Let's set it out and see if it smells. It smells. We don't have int's, but doubles. too mushy.
+
+POWD: what rules should I apply?
+Usual: A^2, A^.2, etc...
+rule: A^1 => A
+
+EXP: rules;
+exp(A+B) = exp(A)*exp(B). Not clear how this helps.
+
+LOG: rule:
+log(A*B) = log(A)+log(B). Not clear how this helps.
+
+2/A => A^{-1} * 2 
+
+>>> 
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+X = Factory.X("X")
+1/X**3
+X/2/3
+X*2/2
+X/2/.5
+X+2-3    # should be X-1
+X+2-3+2  # can't handle, yet.
+
+12/24/2010 --------------------------------------------------------------------------------------
+
+In trying to handle the X1(X2+Y) case I realised I have a potentially very serious issue. 
+The lost of knowledge of correlation between related random variables is a loss of coherence.
+The Monte Carlo model does not have this issue since everything is fed in one piece at a time.
+There are two things to review: the datamodules and the interior-point algorithm 
+to guage the extend of the problem.
+
+Afforestation:
+*) PLDCF function. looks clean.
+*) Y = d * X
+*) Z = X + Y
+*) npv = NPV(R, lifetime) involves independent values.
+*) Z = X / Y
+
+Agriculture:
+capital_cost     = co2__project * cap_cost__co2
+om_cost          = co2__project * om_cost__co2
+co2              = co2__project * NPV(R, lifetime)
+cost             = capital_cost + om_cost * NPV(R, lifetime)
+cpt              = cost/co2
+---
+A = X * Y
+B = X * Z
+C = X * N
+D = A + B * N =  X*Y + X*Z*N
+E = D/C       = (X*Y + X*Z*N)/(X * N) = (Y+Z*N)/N = Y/N + Z
+---
+Notice: co2__project seems irrelevant.
+Notice: if co2__project is not constant then it's more relevant
+---
+co2     = co2__project * NPV(R, lifetime) => NPV(R,lifetime,co2__project), non-constant cashflows
+om_cost = co2__project * om_cost__co2
+OM_cost = NPV(R,liferime,om_cost)  
+---
+Notice: if we allow for non-constant cashflows then we have a coherence issue.
+        The om_costs depend on the co2_per_project and the om_cost_per_co2
+Notice: The co2__project is a 2D array of rv's in (project, time)-space
+	The om_cost__co2 is a parallel 2D array
+	om_cost is a parallel 2D array, clearly.
+Now, we have the following issue addressed clearly by stochastic processes: adjacent points
+in time are correlated. There may be a jump-diffusion or whatever, but the effect is the same.
+
+What does this mean:
+
+Suppose CF = (CF1, CF2, ..., CFn)
+How do we describe the effect that CFn depends on CF{n-1}, CF{n-2}, etc 
+and introduces it's own features like drift and diffusion?
+
+What does the probability distribution look for CF3 given CF2 and CF1?
+
+12/28/2010 --------------------------------------------------------------------------------------
+
+Create the following animations: 
+
+000) N(0,1)^x
+convert -delay 20 *.png -loop 0 animation_000.gif
+002) N(1-x/8,1) * N(x,1)
+convert -delay 10 *.png -loop 0 animation_002.gif
+003) N(1-x/8,1) / N(x,1)
+convert -delay 10 *.png -loop 0 animation_003.gif
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.Normal(1,1,1000)
+(N1 / RandomVariable.Normal(1.1,1,1000)).plot("Y")
+
+>gnuplot
+set xrange [-6:6]
+set yrange [0:2]
+plot "Y" with lines
+
+12/29/2010 --------------------------------------------------------------------------------------
+
+>>> ERROR: partition fails if points = 100, but not 200, 1000. FIXED.
+>>>        Being passed a singleton.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.Normal(1.737374,1,100)
+N2 = RandomVariable.Normal(-5.898990,1,100)
+Y = N1 / N2
+
+N1np = N1.Continuous().split(0)
+Xnp = X.Continuous().split(0)
+
+RandomVariable.ContinuousRandomVariable.multiply(N1np[1], Xnp[1])
+
+NOTE: Here's the case we're not handling: X = ((1,infinity),(0,1))
+      What does this mean, really? Again, it's the infinity handling.
+      Solved by disallowing binary operations on singletons for continuous rv's.
+
+>>> ERROR: Y.P() = 1.024. Infinity not being handled correctly in multiply(). FIXED. See below.
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N1 = RandomVariable.Normal(1.5,1,200)
+N2 = RandomVariable.Normal(0,1,200)
+Y = N1/N2
+Y.plot("Y")
+
+NOTE: The issue here is that we do not handle infinity correctly. How do fix this?
+      The rules: Let Y = X1*X2
+      	  	 Let Y++ means P(Y near +infinity)
+		     Y-- means P(Y near -infinity)
+		     Y+  means P(0 < Y << infinity)
+		 Then P(Y) = (Y--) + (Y-) + (Y+) + (Y++)
+          Thus,
+		 Y++ = (X1+)(X2++) + (X1++)(X2++) + (X1++)(X2+) +
+                       (X1-)(X2--) + (X1--)(X2--) + (X1--)(X2-)
+		 Y-- = (X1+)(X2--) + (X1++)(X2--) + (X1++)(X2-) +
+                       (X1-)(X2++) + (X1--)(X2++) + (X1--)(X2+)
+
+          Becomes,
+		 Y++ = (X1>0)(X2++) + (X1++)(X2+) + (X1<0)(X2--) + (X1--)(X2-)
+		 Y-- = (X1>0)(X2--) + (X1++)(X2-) + (X1<0)(X2++) + (X1--)(X2+)
+
+
+      The rules: Let Y = X1+X2
+		 Y++ = (X1++)(X2 - X2--/2) + (X2++)(X1 - X1--/2)
+		 Y-- = (X1--)(X2 - X2++/2) + (X2--)(X1 - X1++/2)
+
+Now try the NPV case,
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+P = -100000
+R = 25000
+r = .1
+NPV = P
+for t in range(6):
+     N1 = RandomVariable.Normal(R,2000+300*(t+1),1000)
+     N2 = RandomVariable.Normal(r + .1*t,0.2+0.1*t,1000)
+     N3 = RandomVariable.Normal(1,.01,1000)
+     NPV += N1/(1+N2)**((t+1)*N3)
+
+NPV.plot("Y")
+
+median = NPV.Continuous().Median()  # 4612
+
+>gnuplot
+set arrow from 4612,5e-6 to 4612,0
+set xr [-100000:200000]
+set label "median" at 4612,5.2e-6
+set terminal png
+set output 'NPV.png'
+plot "Y" with lines title "NPV"
+
+...
+
+Let's test out the new Percentile() function for ContinuousRandomVariable.
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.ContinuousRandomVariable((-1,0,1,2),(.2,.3,.5))
+X.Percentile(.51)
+X = RandomVariable.ContinuousRandomVariable((-1,0,1,2),(.1,.2,.4))
+X.setNegInf(.15)
+X.setPosInf(.15)
+
+12/30/2010 --------------------------------------------------------------------------------------
+
+Now for some simple shots for NewOrleans
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Normal(1,1,1000)
+Y = RandomVariable.Normal(5,3,1000)
+Z = X*Y
+X.plot("X")
+Y.plot("Y")
+Z.plot("Z")
+Q = Y/X
+Q.plot("Q")
+
+>gnuplot
+set terminal png size 320,240
+set output 'XY.png'
+set xrange [-5:15]
+set yrange [0:.42]
+plot "Y" with lines title "N(5,3)", "X" with lines title "N(1,1)"
+set terminal png size 640,480
+set output 'XxY.png'
+set xrange [-10:20]
+set yrange [0:.25]
+plot "Z" with lines title "N(5,3) * N(1,1)"
+set terminal png size 640,480
+set output 'XdY.png'
+set xrange [-20:30]
+set yrange [0:.125]
+plot "Q" with lines title "N(5,3) / N(1,1)"
+set terminal wxt
+set output
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.Normal(0,1,1000)
+X.plot("X")
+A = X**.9
+B = X**1.1
+A.plot("A")
+B.plot("B")
+
+>gnuplot
+set terminal png size 640,480
+set output 'Xd.png'
+set xrange [-4:4]
+set yrange [0:.71]
+plot "X" with lines title "N(0,1)", "A" with lines title "N(0,1)^0.9", "B" with lines title "N(0,1)^1.1"
+set terminal wxt
+set output
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+X = RandomVariable.ChiSquared(3,10000)
+X.plot("X")
+Y = (-.95)**X
+Y.plot("Y")
+
+>gnuplot
+set terminal png size 320,240
+set output 'X2_3.png'
+set xrange [-1:10]
+set yrange [0:.25]
+plot "X" with lines title "Chi^2(3)"
+set terminal png size 640,480
+set output '95X23.png'
+set xrange [-1.1:1.1]
+set yrange [0:3]
+plot "Y" with lines title "(-0.95)^Chi^2(3)"
+set terminal wxt
+set output
+
+
+>>> Simple NPV (just Gaussian summation)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+r = .1
+NPV = -100000
+for t in range(6):
+     net  = RandomVariable.Normal(25000,1000*(t+1),1000)
+     NPV += net/(1+r)**(t+1)
+
+NPV.plot("Y")
+
+>gnuplot
+set xr [-15000:35000]
+set yr [0:7e-5]
+set label "P(NPV < 0)=7%" at -11000,2e-5
+set arrow from 0,2e-5 to 0,0
+set label "Median = 8882" at 20000,3e-5
+set arrow from 8882,6.5e-5 to 8882,0
+set terminal png
+set output 'NPV_Simple.png'
+plot "Y" with lines title "NPV"
+
+>>> Levelised
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+r = .1
+cost = 100000
+for t in range(6):
+     net  = RandomVariable.Normal(25000,1000*(t+1),1000)
+     cost += net/(1+r)**(t+1)
+
+cost.plot("cost")
+
+tons = 0
+net = 2500 * RandomVariable.ChiSquared(2,1000)
+for t in range(6):
+     tons += net/(1+r)**(t+1)
+
+net.plot("net")
+tons.plot("tons")
+
+CPT = cost/ton
+CPT.plot("CPT")
+
+>gnuplot
+set terminal png size 400,300
+set output 'cost.png'
+set xr [190000:230000]
+set yr [0:7e-5]
+set arrow from 208882,1e-5 to 208882,0
+set label "Average = 208882" at 202000,1.25e-5
+plot "cost" with lines title "NPV of Costs"
+set terminal wxt
+
+set terminal png size 400,300
+set output 'tons.png'
+set xr [0:60000]
+set yr [0:5e-5]
+set arrow from 21776,1e-5 to 21776,0
+set label "Average = 21776" at 21776,1.2e-5
+plot "tons" with lines title "NPV of Reductions (tons)"
+set terminal wxt
+
+set terminal png size 640,480
+set output 'CPT.png'
+set xr [0:30]
+set yr [0:.11]
+set arrow from 9.6,.01 to 9.6,0
+set label "Median = $9.6" at 9.5,0.015
+set label "Average = infinity" at 9.5,0.02
+plot "CPT" with lines title "Cost per Ton"
+set terminal wxt
+
+set terminal png size 400,300
+set output 'cpt.png'
+set xr [0:30]
+set yr [0:.11]
+set arrow from 9.6,.01 to 9.6,0
+set label "Median = $9.6" at 9.5,0.015
+set label "Average = infinity" at 9.5,0.02
+plot "CPT" with lines title "Cost per Ton"
+set terminal wxt
+
+12/31/2010 --------------------------------------------------------------------------------------
+
+Let's get the TreeNode version running.
+
+>>>
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+X = Factory.X("X")
+1/X**3
+X = Factory.Continuous((-1,0,1,2),(.2,.3,.5))
+
+
+NOTE: TreeNode doesn't have pow() running in any form, yet.
+NOTE: The Eval() function hasn't been implemented, yet.
+
+Let's work on the PROPER form concept.
+PROPER is a low-level concept. It lives in the SimpleRandomVariable.
+
+When can we do elementwise operations? Since TreeNodes carry pedigree they decide when
+elementwise operations are appropriate or not. Unary operations are always elementwise.
+
+Let's test Proper()
+>>>
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+Xnode = Factory.Continuous((15,13,12,14,12),(.1,.2,.3,.4))
+X = Xnode.getRandomVariable().Proper()
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+Xnode = Factory.Continuous((15,11,14,13,12),(.1,.2,.3,.4))
+X = Xnode.getRandomVariable().Proper()
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+Xnode = Factory.Discrete((15,11,14,13),(.1,.2,.3,.4))
+X = Xnode.getRandomVariable().Proper()
+
+TODO: Decide in TreeNode when to do elementwise binary operations or full binary.
+TODO: Update operations to improper form. Will capture on create? When?
+
+01/02/2011 --------------------------------------------------------------------------------------
+
+>>> Evolution
+import java.lang.Math as Math
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+N.plot("N")
+L = Math.sqrt(2*Math.PI)/2
+X = RandomVariable.Continuous((-L,L),(1,))
+X1 = X - 8
+X1.plot("X1")
+X2 = X+X - 6
+X2.plot("X2")
+X3 = (X+X+X)/1.333 - 4  # /(4/3)
+X3.plot("X3")
+X4 = (X+X+X+X)/1.5 - 2  # /(3/2)
+X4.plot("X4")
+X5 = (X+X+X+X+X)/1.67   # /(5/3)
+X5.plot("X5")
+
+>gnuplot           # sets line width (lw 3)
+set terminal png size 640,480
+set output 'uniform_to_normal.png'
+set xr [-12:6]
+set yr [0:.5]
+plot "N" with lines lw 3 title "N(0,1)", "X1" with lines title "X = Uniform", "X2" with lines title "X+X", "X3" with lines title "X+X+X", "X4" with lines title "X+X+X+X", "X5" with lines title "X+X+X+X+X"
+
+>>> Evolution (revisited)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+import java.lang.Math as Math
+N = RandomVariable.Normal(0,1,1000)
+N.plot("N")
+L = Math.sqrt(2*Math.PI)/2
+X = RandomVariable.Continuous((-L,L),(1,))
+X1 = X - 8
+X1.plot("X1")
+X2 = X*X - 6
+X2.plot("X2")
+X3 = X*X*X - 4
+X3.plot("X3")
+X4 = X*X*X*X - 2
+X4.plot("X4")
+X5 = X*X*X*X*X
+X5.plot("X5")
+
+>gnuplot           # sets line width (lw 3)
+set terminal png size 640,480
+set output 'uniform_to_spike.png'
+set xr [-12:6]
+set yr [0:5]
+plot "N" with lines lw 3 title "N(0,1)", "X1" with lines title "X = Uniform", "X2" with lines title "X*X", "X3" with lines title "X*X*X", "X4" with lines title "X*X*X*X", "X5" with lines title "X*X*X*X*X"
+
+>>> Exp()
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+N.plot("N")
+X = N.exp()
+X.plot("X")
+Y = N.pow(1.25)
+Y.plot("Y")
+
+>gnuplot
+set terminal png size 320,240
+set output 'normal.png'
+set xr [-4:4]
+set yr [0:.5]
+plot "N" with lines title "Normal(0,1)"
+set terminal png size 320,240
+set output 'lognormal.png'
+set xr [-1:5]
+set yr [0:.7]
+plot "X" with lines title "LogNormal(0,1)"
+set terminal png size 320,240
+set output 'pownormal.png'
+set xr [-3:3]
+set yr [0:1]
+plot "Y" with lines title "Normal(0,1)^1.25"
+set terminal wxt
+
+>>> 2500 * ChiSquared(2)
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+net = 2500 * RandomVariable.ChiSquared(2,1000)
+net.plot("net")
+
+> gnuplot
+set terminal png size 640,480
+set output 'net.png'
+set xr [0:20000]
+set yr [0:.0002]
+set label "Average = 5000" at 5000,0.0001
+set arrow from 5000,.00009 to 5000,0
+plot "net" with lines title "2500 * ChiSquare(2)"
+set terminal wxt
+
+>>> N*N, N^2
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+N = RandomVariable.Normal(0,1,1000)
+X = N*N
+X.plot("X")
+Y = N.pow(2)
+Y.plot("Y")
+
+> gnuplot
+set terminal png size 480,320
+set output 'NtimesN.png'
+set xr [-3:3]
+set yr [0:2]
+plot "X" with lines title "N(0,1) * N(0,1)"
+set terminal wxt
+
+set terminal png size 480,320
+set output 'Nsquared.png'
+set xr [-3:3]
+set yr [0:2]
+plot "Y" with lines title "N(0,1)^2"
+set terminal wxt
+
+01/03/2011 --------------------------------------------------------------------------------------
+
+>>>
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+N = Factory.Normal(0,1,1000)
+N.plot("N")
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+F = Factory.F(3,2,1000)
+F.plot("F")
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+E = Factory.Exponential(4,1000)
+E.plot("E")
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+Chi = Factory.ChiSquared(3,1000)
+Chi.plot("Chi")
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+C = Factory.Cauchy(4,3,1000)
+C.plot("C")
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+B = Factory.Beta(4,3,1000)
+B.plot("B")
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+P = Factory.Poisson(12)
+P.plot("P")
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+a = RandomVariable.Normal(5,4,1000)
+b = RandomVariable.Normal(3,2,1000)
+x = b/a
+ax = a*x
+a.plot("a")
+b.plot("b")
+ax.plot("ax")
+
+>gnuplot
+set terminal png size 480,320
+set output 'bax.png'
+set xr [-4:10]
+set yr [0:.5]
+plot "a" with lines title "a = N(5,4)", "b" with lines title "b = N(3,2)", "ax" with lines title "a * (b/a)"
+set terminal wxt
+
+////////////////////////////////////////////////////////////////////////////////
+Now for Eval(). It's simple-minded. All it decides is which operation to perform
+including the element-wise versus full binary operations. It also kicks off
+the hierarchical construction.
+
+Question) Should be represent a node as a*X^b+c automatically?
+Answer)   Let's go for it!
+
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+N = Factory.Normal(0,1,1000)
+2*N**3+4
+X = N.exp()
+Y = X+X
+
+01/04/2011 --------------------------------------------------------------------------------------
+
+Time to retool for elementwise operations.
+The key is to set proper state when appropriate.
+
+>>>
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+X = Factory.Continuous((-1,0,1,2),(.1,.2,.3))
+Y = (-2*X).X()
+Y.Proper()
+import com.carbonmodelinggroup.PHoX.random.RandomVariableFactory as Factory
+X = Factory.Discrete((-1,0,1,2),(.1,.2,.3,.4))
+Y = (-2*X).X()
+Y.Proper()
+
+Let's make sure, one last time, that pow(d) is elementwise compatible. Scary.
+We'll start with multiply. Lots of issues.
+The simple arithmetic operations can be pushed down into SimpleRandomVariable.
+We need to consider a significant change: make the tail() no longer contain infinite prob.!!!
+Oh, that's a pain!!! The advantage is that we can just operate and sort without special cases.
+There's one little trick I need to update if we change this. The "Discrete Piggy-Back"
+Another issue: If we have no intermediate nodes there is only one probability value (maybe 0)
+It may be better to stub out all non-structural functionality than be constantly updating. No.
+This means there is no distinction between posInf and negInf for continuous random variables.
+
+ 1/05/2011 --------------------------------------------------------------------------------------
+
+PROBLEM: U(-1,1)^2 = U(0,1),  where did the zero come from? The splitter had to put it there!
+ISSUE: Only non-degenerate monotonic operations have share class, not all unary functions. 
+If that's the case we can catch the effect at the Tree level. Except for N+N? No, especially that
+
+So, I'm a bit perplexed. I have the notion of PROPER form, but it only makes sense for discrete
+random variables or monotonic functions of continuous random variables.
+
+What does "CLASS" mean, then? For Discrete random variables we don't mind if they move around
+like particles. Their positional relationships are unimportant to us.
+
+More to the point: U(-1,2) == ((-1,2),(1)), U(-1,2)^2 = ((0,1,4),(1/2,1/2))
+This is no big deal if we realize that ((-1,2),(1)) ~ ((-1,0,2),(1/3,2/3))
+                               so that %^2 => ((1,0,4),(1/3,2/3) => ((0,1,4),(1/2,1/2))
+
+We notice that we always split at 0,1 if ever. In one special case we split at -1.
+Can we enforce that continuous random variables must always contain {-1,0,1} nodes if they
+ever span them? How is this possible? Is it reasonable? Can we act as if this were true?
+Say they are "virtual nodes" and auto-split there? It's splitting and joining that
+are the stuff to do.
+
+ 2/24/2011 --------------------------------------------------------------------------------------
+
+Need to be able to force a particular partition or at least a
+number of partition points.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Continuous((1,2,3),(10,20))
+B = RandomVariable.Continuous((4,5,6),(40,50))
+RandomVariable.force_partition((4,8,12,18))
+A*B
+# ()
+# (4.0(543.3455913812901)8.0(1086.691182762579)12.0(1069.9632258561307)18.0,)
+
+ 4/30/2011 --------------------------------------------------------------------------------------
+
+Introduce proper calculation of expectation. Assume proper form since
+that's the only thing understood in the util.RandomVariable code.
+
+>>>
+import com.carbonmodelinggroup.PHoX.util.RandomVariable as RandomVariable
+A = RandomVariable.Continuous((1,3,7,8),(1/8.,3/4.,1/8.))
+A.E()  # 4.9375
+
+B = RandomVariable.Normal(5,4,1000)
+B.E()  # 4.999999999
+
+C = RandomVariable.Discrete((1,3,7),(1/8.,3/4.,1/8.))
+C.E()  # 3.25

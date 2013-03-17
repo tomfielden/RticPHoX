@@ -1,0 +1,68 @@
+<project name="RticPHoX" default="pdf" basedir=".">
+    <description>RticPHoX Documentation Project</description>
+  <!-- set global properties for this build -->
+
+  <property name="project_name" value="RticPHoX"   />
+  <property name="dist"         location="../dist" />
+  
+  <!-- pdf target -->
+
+  <target name="pdf" depends="dvi" description="create the pdf from dvi">
+    <exec executable="dvipdf">
+      <arg value="${project_name}.dvi"/>
+      <arg value="${dist}/${project_name}.pdf"/>
+    </exec>
+  </target>
+
+  <target name="dvi" depends="init" description="create the dvi">
+    <exec executable="latex">
+      <arg value="${project_name}.tex"/>
+    </exec>
+  </target>
+  
+  <!-- web target -->
+
+  <target name="web" depends="xml" description="create the web docs">
+    <exec executable="latexmlpost">
+      <arg value="--novalidate"/>
+      <arg value="--dest=${dist}/${project_name}.xhtml"/>
+      <arg value="${project_name}.xml"/>
+    </exec>
+  </target>
+
+  <target name="xml" depends="init" description="create the web docs">
+    <exec executable="latexml">
+      <arg value="--dest=${project_name}.xml"/>
+      <arg value="${project_name}.tex"/>
+    </exec>
+  </target>
+
+  <!-- supporting targets -->
+	
+  <target name="clean" description="clean up" >
+    <!-- Delete the ${build} and ${dist} directory trees -->
+    <defaultexcludes remove="**/*~"/>
+    <delete><fileset dir="." includes="*.aux"/></delete>
+    <delete><fileset dir="." includes="*.dvi"/></delete>
+    <delete><fileset dir="." includes="*.lo?"/></delete>
+    <delete><fileset dir="." includes="*.toc"/></delete>
+    <delete><fileset dir="." includes="*.xml"/></delete>
+    <delete><fileset dir="." includes="*~"/></delete>
+    <delete file="${dist}/${project_name}.pdf"/>
+    <delete file="${dist}/${project_name}.xhtml"/>
+    <delete file="${dist}/LaTeXML.cache"/>
+    <delete file="${dist}/core.css"/>
+  </target>
+
+  <target name="init" description="initialize the build environment" >
+    <!-- Create the time stamp -->
+    <tstamp/>
+    <!-- Create directory structures -->
+    <mkdir dir="${dist}"/>
+  </target>
+  
+  <target name="all" depends="clean">
+  </target>
+  
+</project>
+

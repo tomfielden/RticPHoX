@@ -1,0 +1,11 @@
+# LaTeX intermediate files #
+############################
+*.aux
+*.bbl
+*.blg
+*.lof
+*.log
+*.lot
+*.toc
+*.dvi
+

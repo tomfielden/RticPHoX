@@ -1,0 +1,152 @@
+"ROW HEADER"	"Title"	"Sheet"	"Cell"	"Case 1"	"Case 2"	"Case 3"	"Case 4"	"Case 5"	"Case 6"	"Case 7"	"Case 8"	"Case 12"
+"Reference"	"Input Assumption"	"Worksheet"	"Range"	"Case 1: Low-Growth Electric and Gas Utility"	"Case 2: High-Growth Electric and Gas Utility"	"Case 3: Low Growth with 2009 Powerplant"	"Case 4: High Growth with 2009 Powerplant"	"Case 5: Vertically Integrated Utility"	"Case 6: Delivery Utility"	"Case 7: Electric Public/Coop - Debt Coverage Ratio"	"Case 8: Electric Public/Coop - No Debt"	"Case 12: National Case"
+"Step1:B3"	"1=Investor-owned, 2=Public Power and Cooperative Utilities"	"Step1"	"B3"	1	1	1	1	1	1	2	2	1
+"Step1:B4"	"Electric Utility (Enter TRUE, if electric, otherwise FALSE)"	"Step1"	"B4"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"
+"Step1:B5"	"Natural Gas Utility (Enter TRUE, if electric, otherwise FALSE)"	"Step1"	"B5"	"TRUE"	"TRUE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"TRUE"
+"Step1:B9"	"Peak Load (MW) - Year0"	"Step1"	"B9"	600	600	600	600	600	600	600	600	956000
+"Step1:B10"	"Annual Load Factor - Year 0"	"Step1"	"B10"	0.45	0.45	0.45	0.45	0.45	0.45	0.45	0.45	0.4617556027
+"Step1:B12"	"Forecast Sales Growth Rate "	"Step1"	"B12"	0.01	0.05	0.01	0.05	0.02	0.02	0.02	0.02	0.016
+"Step1:B16"	"Average Rate ($/kWh) - Year 0"	"Step1"	"B16"	0.12	0.12	0.12	0.12	0.12	0.12	0.12	0.12	0.085815378
+"Step1:B22"	"Average Cost of Purchased Power or Average Production Cost ($/MWh)"	"Step1"	"B22"	61	61	61	61	40	61	61	61	61.0583068256
+"Step1:B23"	"Average Marginal Losses (for Energy Savings)"	"Step1"	"B23"	0.06	0.06	0.06	0.06	0.06	0.06	0.06	0.06	0.06
+"Step1:B25"	"Generation Capacity Cost if purchased ($/kW-yr)"	"Step1"	"B25"	40	40	40	40	0	40	40	40	0
+"Step1:B26"	"Cost Escalation of Average Energy and Capacity Cost"	"Step1"	"B26"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:B29"	"Use Market Price for Marginal Cost"	"Step1"	"B29"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"
+"Energy Forecast:C3"	"Market Price Hub Selection"	"Energy Forecast"	"C3"	15	15	15	15	15	15	15	15	15
+"Step1:B31"	"Input Peak Price ($/MWh)"	"Step1"	"B31"	0	0	0	0	0	0	0	0	65
+"Step1:B32"	"Peak to Off-Peak Price Ratio"	"Step1"	"B32"	1.65	1.65	1.65	1.65	1.65	1.65	1.65	1.65	1.65
+"Step1:B33"	"Marginal Cost Escalation"	"Step1"	"B33"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Emissions:C3"	"Peak Period Emissions Technology"	"Emissions"	"C3"	2	2	2	2	2	2	2	2	2
+"Emissions:D3"	"Off-Peak Period Emissions Technology"	"Emissions"	"D3"	1	1	1	1	1	1	1	1	1
+"Step1:B46"	"$/Ton CO2"	"Step1"	"B46"	9.3	9.3	9.3	9.3	9.3	9.3	9.3	9.3	9.261
+"Step1:B47"	"$/lb Nox"	"Step1"	"B47"	4.6	4.6	4.6	4.6	4.6	4.6	4.6	4.6	4.6285714286
+"Step1:B48"	"$/lb PM-10"	"Step1"	"B48"	6.5	6.5	6.5	6.5	6.5	6.5	6.5	6.5	6.4749593845
+"Step1:B49"	"$/lb Sox"	"Step1"	"B49"	0	0	0	0	0	0	0	0	0
+"Step1:B50"	"$/lb CO"	"Step1"	"B50"	0	0	0	0	0	0	0	0	0
+"Step1:B51"	"$/lb VOC"	"Step1"	"B51"	0	0	0	0	0	0	0	0	0
+"Step1:B53"	"Escalation Rate"	"Step1"	"B53"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:B57"	"Average Asset Book Depreciation (years)"	"Step1"	"B57"	30	30	30	30	30	30	30	30	30
+"Step1:B58"	"Tax depreciation (years)"	"Step1"	"B58"	20	20	20	20	20	20	20	20	20
+"Step1:B60"	"Total Year0 CapEx ($M) - Except Line Item Schedule"	"Step1"	"B60"	40	40	40	40	70	40	40	40	19733.3333333333
+"Step1:B61"	"Capex Cost Escalation"	"Step1"	"B61"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:B62"	"Percent Capex Growth Related"	"Step1"	"B62"	0.3	0.3	0.3	0.3	0.3	0.3	0.3	0.3	0.3243243243
+"Step1:B67"	"O&M, other expense as % of yr0 revenue"	"Step1"	"B67"	0.05	0.05	0.05	0.05	0.05	0.05	0.05	0.05	0.05
+"Step1:B69"	"O&M Escalation Rate"	"Step1"	"B69"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:B73"	"Debt Cost - Investor-owned"	"Step1"	"B73"	0.07	0.07	0.07	0.07	0.07	0.07	0.07	0.07	0.07
+"Step1:B74"	"Debt % - Investor Owned"	"Step1"	"B74"	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5
+"Step1:B75"	"Target Return on Equity - Investor Owned"	"Step1"	"B75"	0.11	0.11	0.11	0.11	0.11	0.11	0.11	0.11	0.11
+"Step1:B79"	"Federal Tax Rate"	"Step1"	"B79"	0.35	0.35	0.35	0.35	0.35	0.35	0.35	0.35	0.35
+"Step1:B80"	"State Tax Rate"	"Step1"	"B80"	0.085	0.085	0.085	0.085	0.085	0.085	0.085	0.085	0
+"Step1:B83"	"Rate Base Assets $MM (book and tax)"	"Step1"	"B83"	1100	1100	1100	1100	1600	1100	1100	1100	400000
+"Step1:B86"	"Debt Cost - Public Utility"	"Step1"	"B86"	0	0	0	0	0	0	0	0	0.05
+"Step1:B88"	"Debt Amount Year 0 - Public Utility"	"Step1"	"B88"	0	0	0	0	0	0	0	0	250
+"Step1:B93"	"1=Regular Cycle, 2=Earnings Band"	"Step1"	"B93"	1	1	1	1	1	1	1	1	1
+"Step1:B94"	"Years between rate cases"	"Step1"	"B94"	4	4	4	4	4	4	4	4	1
+"Step1:B95"	"Next rate case year for cyclical rate cycle"	"Step1"	"B95"	2007	2007	2007	2007	2007	2007	2007	2007	2007
+"Step1:B96"	"Band on earnings (+/- ROE) for earnings band rate cycle"	"Step1"	"B96"	0	0	0	0	0	0	0	0	0.02
+"Step1:B99"	"1=Debt Service Coverage Ratio, 2=Cash Position"	"Step1"	"B99"	0	0	0	0	0	0	1	2	2
+"Step1:B100"	"Percent of Revenue for Payment in Lieu of Tax"	"Step1"	"B100"	0	0	0	0	0	0	0.05	0.05	0.01
+"Step1:B103"	"Debt Service Coverage Ratio (assumed pre-tax)"	"Step1"	"B103"	0	0	0	0	0	0	2	2	2
+"Step1:B104"	"Target Debt Service Coverage Ratio"	"Step1"	"B104"	0	0	0	0	0	0	2	2	2
+"Step1:B107"	"Cash Position (Year 0) $M"	"Step1"	"B107"	0	0	0	0	0	0	70	70	50
+"Step1:B108"	"Minimum Cash position before targetting an increase"	"Step1"	"B108"	0	0	0	0	0	0	75	75	45
+"Step1:B114"	"Investment 1 Year"	"Step1"	"B114"	0	0	2009	2009	0	0	0	0	2010
+"Step1:C114"	"Investment 1 Description"	"Step1"	"C114"	0	0	"Construct New 500MW CCGT"	"Construct New 500MW CCGT"	0	0	0	0	"Investment 1 Description"
+"Step1:D114"	"Investment 1 Cost"	"Step1"	"D114"	0	0	500	500	0	0	0	0	0
+"Step1:B115"	"Investment 2 Year"	"Step1"	"B115"	0	0	0	0	0	0	0	0	2010
+"Step1:C115"	"Investment 2 Description"	"Step1"	"C115"	0	0	0	0	0	0	0	0	"Investment 2 Description"
+"Step1:D115"	"Investment 2 Cost"	"Step1"	"D115"	0	0	0	0	0	0	0	0	0
+"Step1:B116"	"Investment 3 Year"	"Step1"	"B116"	0	0	0	0	0	0	0	0	2010
+"Step1:C116"	"Investment 3 Description"	"Step1"	"C116"	0	0	0	0	0	0	0	0	"Investment 3 Description"
+"Step1:D116"	"Investment 3 Cost"	"Step1"	"D116"	0	0	0	0	0	0	0	0	0
+"Step1:E9"	"Peak Day Sales (Mcf/day)"	"Step1"	"E9"	183	183	183	183	183	183	183	183	121479
+"Step1:E10"	"Annual Load Factor - Year 0"	"Step1"	"E10"	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5000018606
+"Step1:E12"	"Forecast Sales Growth Rate "	"Step1"	"E12"	" - "	0.02	0.007	0.007	0.007	0.007	0.007	0.007	0.007
+"Step1:E16"	"Average Rate ($/therm)"	"Step1"	"E16"	"1.00 "	"1.00 "	"1.00 "	"1.00 "	"1.00 "	"1.00 "	"1.00 "	"1.00 "	0.9287817992
+"Step1:E22"	"Average Cost of Purchased Fuel or Average Production Cost ($/MMBtu)"	"Step1"	"E22"	"4.00 "	"4.00 "	"4.00 "	"4.00 "	"4.00 "	"4.00 "	"4.00 "	"4.00 "	4.0478888069
+"Step1:E23"	"Losses and Unaccounted For"	"Step1"	"E23"	0.05	0.05	0.05	0.05	0.05	0.05	0.05	0.05	0.05
+"Step1:E25"	"Capacity Cost/Storage if purchased ($/mcf/day)"	"Step1"	"E25"	0	0	0	0	0	0	0	0	0
+"Step1:E26"	"Cost Escalation"	"Step1"	"E26"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:E29"	"Use Market Price for Marginal Cost "	"Step1"	"E29"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"
+"Step1:E30"	"Basis Adjustment to Henry Hub"	"Step1"	"E30"	0	0	0	0	0	0	0	0	0
+"Step1:E31"	"Input Winter Price (Year 1) ($/MMBtu)"	"Step1"	"E31"	0	0	0	0	0	0	0	0	8
+"Step1:E32"	"Winter to Summer Price Ratio"	"Step1"	"E32"	1.3	1.3	1.3	1.3	1.3	1.3	1.3	1.3	1.26
+"Step1:E33"	"Marginal Cost Escalation (also for Henry Hub post-2011)"	"Step1"	"E33"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:E42"	"Tons CO2 per MMBtu"	"Step1"	"E42"	0.06	0.06	0.06	0.06	0.06	0.06	0.06	0.06	0.0585
+"Step1:E43"	"lbs Nox per MMBtu"	"Step1"	"E43"	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0.1
+"Step1:E46"	"$/Ton CO2"	"Step1"	"E46"	9.3	9.3	9.3	9.3	9.3	9.3	9.3	9.3	9.261
+"Step1:E47"	"$/lb Nox"	"Step1"	"E47"	4.6	4.6	4.6	4.6	4.6	4.6	4.6	4.6	4.6285714286
+"Step1:E48"	"$/lb PM-10"	"Step1"	"E48"	6.5	6.5	6.5	6.5	6.5	6.5	6.5	6.5	6.4749593845
+"Step1:E49"	"$/lb Sox"	"Step1"	"E49"	0	0	0	0	0	0	0	0	0
+"Step1:E50"	"$/lb CO"	"Step1"	"E50"	0	0	0	0	0	0	0	0	0
+"Step1:E51"	"$/lb VOC"	"Step1"	"E51"	0	0	0	0	0	0	0	0	0
+"Step1:E53"	"Escalation Rate"	"Step1"	"E53"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:E57"	"Average Asset Book Depreciation (years)"	"Step1"	"E57"	50	50	50	50	50	50	50	50	50
+"Step1:E58"	"Tax depreciation (years)"	"Step1"	"E58"	30	30	30	30	30	30	30	30	30
+"Step1:E60"	"Total Year0 CapEx ($M) - Except Line Item Schedule"	"Step1"	"E60"	20	20	20	20	20	20	20	20	22330
+"Step1:E61"	"Capex Cost Escalation"	"Step1"	"E61"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:E62"	"Percent Capex Growth Related"	"Step1"	"E62"	0.55	0.55	0.55	0.55	0.55	0.55	0.55	0.55	0.55
+"Step1:E67"	"O&M, other expense as % of revenue"	"Step1"	"E67"	0.05	0.05	0.05	0.05	0.05	0.05	0.05	0.05	0.05
+"Step1:E69"	"O&M escalation rate"	"Step1"	"E69"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023
+"Step1:E73"	"Debt Cost - Investor-owned"	"Step1"	"E73"	0.07	0.07	0.07	0.07	0.07	0.07	0.07	0.07	0.07
+"Step1:E74"	"Debt % - Investor Owned"	"Step1"	"E74"	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5
+"Step1:E75"	"Target Return on Equity - Investor Owned"	"Step1"	"E75"	0.11	0.11	0.11	0.11	0.11	0.11	0.11	0.11	0.11
+"Step1:E79"	"Federal Tax Rate"	"Step1"	"E79"	0.35	0.35	0.35	0.35	0.35	0.35	0.35	0.35	0.35
+"Step1:E80"	"State Tax Rate"	"Step1"	"E80"	0.085	0.085	0.085	0.085	0.085	0.085	0.085	0.085	0
+"Step1:E83"	"Rate Base Assets $MM (book and tax)"	"Step1"	"E83"	1000	1000	1000	1000	1000	1000	1000	1000	525000
+"Step1:E86"	"Debt Cost"	"Step1"	"E86"	0	0	0	0	0	0	0	0	0.06
+"Step1:E88"	"Debt Amount Year 0"	"Step1"	"E88"	0	0	0	0	0	0	0	0	275
+"Step1:E93"	"1=Regular Cycle, 2=Earnings Band"	"Step1"	"E93"	1	1	1	1	1	1	1	1	1
+"Step1:E94"	"Years between rate cases"	"Step1"	"E94"	4	4	4	4	4	4	4	4	1
+"Step1:E95"	"Next rate case year for cyclical rate cycle"	"Step1"	"E95"	2007	2007	2007	2007	2007	2007	2007	2007	2007
+"Step1:E96"	"Band on earnings (+/- ROE) for earnings band rate cycle"	"Step1"	"E96"	0	0	0	0	0	0	0	0	0.02
+"Step1:E99"	"1=Debt Service Coverage Ratio, 2=Cash Position"	"Step1"	"E99"	0	0	0	0	0	0	0	0	2
+"Step1:E100"	"Percent of Revenue for Payment in Lieu of Tax"	"Step1"	"E100"	0	0	0	0	0	0	0	0	0.015
+"Step1:E103"	"Minimum Debt Service Coverage Ratio (or Rates are Reset)"	"Step1"	"E103"	0	0	0	0	0	0	0	0	2
+"Step1:E104"	"Target debt service when rates are reset"	"Step1"	"E104"	0	0	0	0	0	0	0	0	2.2
+"Step1:E107"	"Cash Position (Year 0) $M"	"Step1"	"E107"	0	0	0	0	0	0	0	0	50
+"Step1:E108"	"Minimum Cash position before targetting an increase"	"Step1"	"E108"	0	0	0	0	0	0	0	0	45
+"Step1:E114"	"Investment 1 Year"	"Step1"	"E114"	0	0	0	0	0	0	0	0	2010
+"Step1:F114"	"Investment 1 Description"	"Step1"	"F114"	0	0	0	0	0	0	0	0	"Investment 1 Description"
+"Step1:G114"	"Investment 1 Cost"	"Step1"	"G114"	0	0	0	0	0	0	0	0	0
+"Step1:E115"	"Investment 2 Year"	"Step1"	"E115"	0	0	0	0	0	0	0	0	2010
+"Step1:F115"	"Investment 2 Description"	"Step1"	"F115"	0	0	0	0	0	0	0	0	"Investment 2 Description"
+"Step1:G115"	"Investment 2 Cost"	"Step1"	"G115"	0	0	0	0	0	0	0	0	0
+"Step1:E116"	"Investment 3 Year"	"Step1"	"E116"	0	0	0	0	0	0	0	0	2010
+"Step1:F116"	"Investment 3 Description"	"Step1"	"F116"	0	0	0	0	0	0	0	0	"Investment 3 Description"
+"Step1:G116"	"Investment 3 Cost"	"Step1"	"G116"	0	0	0	0	0	0	0	0	0
+"Step2:B4"	"EE Program Budget = % of Base Case revenue"	"Step2"	"B4"	0.02	0.02	0.02	0.02	0.02	0.02	0.02	0.02	0.02
+"Step2:B5"	"EE Administrator Cost $/MWh"	"Step2"	"B5"	20	20	20	20	20	20	20	20	20
+"Step2:B6"	"Participant Cost $/MWh"	"Step2"	"B6"	15	15	15	15	15	15	15	15	15
+"Step2:B8"	"EE Cost Escalation"	"Step2"	"B8"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.02
+"Step2:B9"	"EE Life (Years) (maximum 15 per model term)"	"Step2"	"B9"	15	15	15	15	15	15	15	15	15
+"Step2:E4"	"Percent of Energy Savings on Peak (%)"	"Step2"	"E4"	0.75	0.75	0.75	0.75	0.75	0.75	0.75	0.75	0.75
+"Step2:E5"	"EE Capacity Savings (peak MW / average MW)"	"Step2"	"E5"	2	2	2	2	2	2	2	2	2
+"Step2:E7"	"Growth Related Gen Capacity Saved"	"Step2"	"E7"	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0
+"Step2:E8"	"Growth Related Capex Saved"	"Step2"	"E8"	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.5	0.25
+"Step2:E9"	"Decrease in market price"	"Step2"	"E9"	0	0	0	0	0	0	0	0	0
+"Step2:E10"	"Monetize Emissions Savings"	"Step2"	"E10"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"
+"Step2:H13"	"Variation in average purchased energy cost"	"Step2"	"H13"	0	0	0	0	0	0	0	0	0
+"Step2:H14"	"Variation in marginal energy cost "	"Step2"	"H14"	0	0	0	0	0	0	0	0	0
+"Step2:H15"	"Variation in forecast sales "	"Step2"	"H15"	0	0	0	0	0	0	0	0	0
+"Step2:H16"	"% of EE in Ratesetting Forecast"	"Step2"	"H16"	1	1	1	1	1	1	1	1	1
+"Step2:B12"	"EE Program Budget = % of Base Case revenue"	"Step2"	"B12"	0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.005
+"Step2:B13"	"EE Administrator Cost $/MMBtu"	"Step2"	"B13"	1.5	1.5	1.5	1.5	1.5	1.5	1.5	1.5	1.5
+"Step2:B14"	"Participant Cost $/MMBtu"	"Step2"	"B14"	1.5	1.5	1.5	1.5	1.5	1.5	1.5	1.5	1.5
+"Step2:B16"	"EE Cost Escalation"	"Step2"	"B16"	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.023	0.02
+"Step2:B17"	"EE Life (Years) (maximum 15 per model term)"	"Step2"	"B17"	15	15	15	15	15	15	15	15	15
+"Step2:E12"	"Percent of Energy Savings in Winter (%)"	"Step2"	"E12"	0.75	0.75	0.75	0.75	0.75	0.75	0.75	0.75	0.75
+"Step2:E14"	"Growth Related Capex Saved"	"Step2"	"E14"	0.25	0.25	0.25	0.25	0.25	0.25	0.25	0.25	0.1
+"Step2:E15"	"Monetize Emissions Savings"	"Step2"	"E15"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"
+"Step2:E16"	"Decrease in market price"	"Step2"	"E16"	0	0	0	0	0	0	0	0	0
+"Step2:H18"	"Variation in average purchased energy cost"	"Step2"	"H18"	0	0	0	0	0	0	0	0	0
+"Step2:H19"	"Variation in marginal energy cost"	"Step2"	"H19"	0	0	0	0	0	0	0	0	0
+"Step2:H20"	"Variation in forecast sales"	"Step2"	"H20"	0	0	0	0	0	0	0	0	0
+"Step2:H21"	"% of EE in Ratesetting Forecast"	"Step2"	"H21"	1	1	1	1	1	1	1	1	1
+"Step2:H4"	"No EE Case"	"Step2"	"H4"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"TRUE"
+"Step2:H5"	"With EE Case"	"Step2"	"H5"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"	"TRUE"
+"Step2:H8"	"Add Shareholder Incentives"	"Step2"	"H8"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"	"FALSE"
+"Step2:H9"	"Target Incentive (% of EE Budget)"	"Step2"	"H9"	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0
+"Step2:H10"	"Additional EE Implemented"	"Step2"	"H10"	0	0	0	0	0	0	0	0	0
+"Interpretation:R12"	"Electric Parameter Tested"	"Interpretation"	"R12"	"Load Growth "	"Load Growth"	"Load Growth"	"Load Growth "	"Vertical Utility"	"Delivery Utility"	"Debt Coverage Ratio"	"Cash Position"	"National Case"
+"Interpretation:U12"	"Natural Gas Parameter Tested"	"Interpretation"	"U12"	"Load Growth "	"Load Growth"	"Load Growth"	"Load Growth "	"Vertical Utility"	"Delivery Utility"	"Debt Coverage Ratio"	"Cash Position"	"National Case"

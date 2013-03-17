@@ -1,0 +1,28 @@
+### 10/14/2011 ###
+Started the TeX documentation project of RticPHoX.
+The goal is to have the system documented with theory of operation not
+available in Oxygen-based documentation.
+
+%
+sudo apt-get install texlive-latex-base
+
+% DON"T BOTHER WITH THE FOLLOWING IF/SINCE NOT USING TIKZ.
+sudo apt-get install texlive-latex-extra  # for tikz      << TODO
+sudo apt-get install texlive-math-extra   # for stmaryrd
+
+### 10/18/2011 ###
+
+Try "latexml" from the Repository. Example,
+%>
+latexml --dest=RticPHoX.xml RticPHoX.tex
+latexmlpost --dest=RticPHoX.xhtml RticPHoX
+
+
+We do the following for pdf instead of pdflatex (two step) because it can't handle .EPS
+%>
+latex RticPHoX.tex
+dvipdf RticPHoX.dvi
+
+TODO: get ANT running for building the docs.
+
+

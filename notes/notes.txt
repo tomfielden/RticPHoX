@@ -1,0 +1,3191 @@
+### 9/30/2011 ###
+
+Getting the RticPHoX up and running. First we install Jython, GLPK-java and
+Commons-math (from Apache). They are all now part of the repository so that
+part is easy! Only need to set the CLASSPATH and we're good to go.
+Need Java6-Open-JDK (repository)
+
+sudo apt-get install openjdk-6-jdk
+sudo update-alternatives --config java   # select correct version (optional?)
+sudo apt-get install ant
+sudo apt-get install junit
+sudo apt-get install latexml
+sudo apt-get install libglpk-java
+sudo apt-get install gnuplot
+
+Needed at least:
+  Jython 2.5.2
+  JavaPlot-0.4.0                // available in ./lib
+  commons-math-2.2              // Apache
+
+sudo apt-get install texlive-latex-base
+sudo apt-get install texlive-latex-recommended
+sudo apt-get install texlive-fonts-recommended
+
+NB: The build.xml file must have it's own classpath <fileset>'s
+
+### 10/3/2011 ###
+
+Copied most of the relevant code into it's new home at ~/com/tomfielden/util/
+Next we need to build it and start building up the documentation so we can test
+Q) What is the best way to document and embed operational code?
+   Can code be executed from within emacs? Would I want to? Copy/Paste?
+
+There are some updates to make to Variant to allow for the new version of
+Jython (2.2.1). Either that or upgrade to the newer (2.5.x). Maybe. Done.
+
+:LinearProgramming Optimization:
+>>>
+#import com.tomfielden.util.GlpkSolver as GlpkSolver
+from com.tomfielden.util import *
+p  = Variant((10, 6, 4))
+A  = Variant(((1,1,1), (10,4,5), (2,2,6)))
+b  = Variant((100, 600, 300))
+LP = GlpkSolver(p, A, b, 1)
+
+Damn! The GLPK is firing, but telling me the solution is unbounded. Nuts!
+
+### 10/4/2011 ###
+
+Let's try the Gass numbers,
+
+>>>
+from com.tomfielden.util import *
+p  = Variant((45,80))
+A  = Variant(((5,20), (10,15)))
+b  = Variant((400,450))
+LP = GlpkSolver(p, A, b, 1)
+
+Doh! This works just fine.
+Let's give it a facelift. I had the secret parameter "1" for maximize
+and the fact that I can't just call it from Jython w/o Variant.
+Let's make it NOT autorun. And change it's name to just Glpk. 
+
+Now we have,
+
+>>>
+from com.tomfielden.util import *
+p  = (45,80)
+A  = ((5,20), (10,15))
+b  = (400,450)
+LP = Glpk(p, A, b).maximize()
+
+Let's make ant create a jar file. It's cleaner.
+
+>>>
+from com.tomfielden.util import *
+Glpk((45,80), ((5,20), (10,15)), (400,450)).maximize()
+
+Need to be able to create a random sample from each known dsn. Does commons-math
+just do this? Can I double up on the RandomVariable code bits that do dsn's?
+
+We want to replicate and test some quantile regression modeling. The first thing
+is a linear regression: y = bo + x*b1 + e
+then quadratic          y = bo + x*b1 + x^2*b2 + e
+
+If we assume that e is normally distributed then we're asking for a sample we 
+can then impose a linear model over. This is very numpy-like.
+
+The random sample would come in the form of a 1D array. Let's just make sure we 
+can do what we need,
+
+>>>
+from com.tomfielden.util import *
+e = Variant((5,4,3,6.1,1.3,.2))
+x = Variant((1,2,3,4,  5,  6))
+y = 2 + x*e
+
+We're out of luck. mult not supported for ARRAY or INDEX. Let's work on this.
+I'm a little concerned here since I'll be modifying the definition of some 
+things and I don't have a full testing regime in place. DONE.
+
+It appears that "hadamard" is only used in SparseMatrix and not anywhere else.
+Really it's the way you think about the array: as a matrix or just an array
+that determines the rules for binary combination. Two arrays, it's easy; 
+hadamard.
+
+Now, about that random sample. It's an array we need to result. 
+Commons-math has a a number of statistics routines including OLS.
+It's the ./Distributions we care about. It will just do a sample.
+
+Now, let's think about how to do this. I would like Variant to handle random
+variables, but I don't want too tight an integration or it will be stifeling.
+At the same time I don't want to be too in bed with Commons-math. 
+Clearly a level of indirection is required. How about we create a factory
+that created distributions? Um, let's try some code ideas,
+
+>>> e = Normal(0,1).sample(100)
+
+If this were the case, we would create a Normal(0,1) random variable object.
+Lazy initialization would dictate that no internal representation has been 
+chosen. Once a representation is chosen a new object embodying that 
+representation is created. This makes "Normal" a random variable factory. 
+In fact, we don't want a random variable at this time, we want a sample. 
+In this case the factory would create a Variant of type ARRAY (internally: 
+Double[]). We have therefore implied the existence of a parameterized factory. 
+In fact the "Normal" is merely a child of RandomVariableFactory which accepts a 
+specific set of parameters.
+
+This brings us to the question of what is a random variable in our system. 
+I think it should be a Variant. The named random variables (factories) should 
+live in ./util along with Variant since this is my personal utility directory. 
+The actual guts of random variables should live in ./random and only be imported
+for testing purposes.
+
+How about this,
+
+>>>
+from com.tomfielden.util import *
+e = RandomVariable.Normal(0,1).sample(100)
+
+In this case we have a RandomVariable[Factory] object that contains static 
+methods. The Normal object is really symbolic and just another (parametric) 
+factory, but an honest factory object.
+
+Now we need a utility to do linspace: Variant.linspace(2,5,100)
+
+>>>
+from com.tomfielden.util import *
+x = Variant.linspace(5,10,3)
+
+>>>
+from com.tomfielden.util import *
+e = RandomVariable.Normal(0,1).sample(100)
+x = Variant.linspace(1,100,100)
+y = 2 + x + e
+
+Now we need some output routines. A graph would be very nice 
+so we don't have to use GnuPlot directly.
+Unless there is a Java interface I can use!
+
+See: JavaPlot (JavaGnuPlot)
+http://gnujavaplot.sourceforge.net/JavaPlot/About.html
+ Example:
+Create a file (e.g. test.java) with this code:
+--------------
+import com.panayotis.gnuplot.JavaPlot;
+
+public class test {
+    public static void main(String[] args) {
+        JavaPlot p = new JavaPlot();
+        p.addPlot("sin(x)");
+        p.plot();
+    }
+}
+-------------------
+Compile this file as follows:
+%> javac -cp PATH_TO_JAVAPLOT/dist/JavaPlot.jar test.java
+and run it:
+%> java -cp PATH_TO_JAVAPLOT/dist/JavaPlot.jar:. test
+
+### 10/5/2011 ###
+
+Q) How do we integrate JavaPlot into our set of utilities with the 
+   understanding that it might need to be replaced or altered somehow. 
+Q) How do we plot data with JavaPlot without creating an external file.
+        JavaPlot p = new JavaPlot();
+        double[][] data = {{1, 1.1,3}, {2, 2.2,3}, {3, 3.3,3.4}, {4, 4.3,5}};
+	p.newGraph3D();    // needed for 3D plotting.
+        p.addPlot(data);
+        p.plot();
+
+Variant must then produce a double[][] of Points where Point = {xi,yi}. 
+The is really the "transpose" of {x,y} where x,y are double[].
+Not sure how Variant should handle this. Have to think about it...
+
+In the meantime we can create a Plot class that knows how to use JavaPlot and 
+Variant as well as RandomVariable eventually. It should know all the different 
+ways I like to view stuff in GnuPlot. It's a bit "distant" at the moment, 
+but coming "near" how this should behave. Almost ready to give it a start.
+
+How are we doing with regression (OLS and quantile), Econometrics, 
+Logit and NWPPC?
+
+With Plots there are various ways to do plotting. We need to keep a level of 
+indirection. We can create a Plot object and fill it in, then show it rather 
+than assuming a fixed menu of plots. We can have defaults beyond the usual 
+GnuPlot defaualt. Also, there should be a richer structure to properly 
+represent our situation. Not everything is a hierarchy of classes.
+
+So, how should Plot work? Let's try some options,
+
+>>>
+from com.tomfielden.util import *
+x = Variant.linspace(5,10,3)
+Plot(x)
+
+This is the inial "smart" usage. It accepts a Variant or Jython object 
+and shows it somehow. This implies that Plot must be an instantiable class 
+that immediately acts. A verb. If we want to modify the default behaviour 
+we have no opportunity beyond more constructors. How would that look?
+
+p = Plot()
+
+Now we have a plotting object that could be a factory for other stuff. 
+For example we may want to add titles, decorations, panels, etc. 
+Let's keep it real simple for now. The only question is: are we precluding 
+important flexibility by allowing Plot to be and instatiable class? 
+I suppose Plot could choose to farm out the operation in the future.
+
+In the meantime there is the following need:
+if x~Variant is a Double[] then we want Plot to choose a default x-axis.
+if x~Variant is x,y values (how?) then we want something else. 
+Need an example...
+Oh, how about Plot(x,y). There's your example.
+
+Let's try it out,
+
+>>>
+from com.tomfielden.util import *
+X = Variant((5,3,4,2,7))
+Plot.show(X)
+
+This works. We could pass in some other parameters, I suppose. 
+Let's take it slow.
+We will need to examine the Variant type and switch on that somehow. 
+In the Meantime,
+
+>>>
+from com.tomfielden.util import *
+e = RandomVariable.Normal(0,1).sample(100)
+x = Variant.linspace(0,10,100)
+y = 2 + x + e
+Plot.show(x,y)
+
+>>> Plot.show(x,y,".")                        
+>>> Plot.show(x,y,"h")
+>>> Plot.show(x,y,"s")
+>>> Plot.show(x,y,"L")
+>>> Plot.show(x,y,"+")
+>>> Plot.show(x,y,"i")
+>>> Plot.show(x,y,"-")  # the default.
+
+Now we need to do multiple plots on the same page to compare.
+
+Suppose X, Y1, and Y2 then we have,
+
+>>> Plot().plot(X,Y1).plot(X,Y2,"L").show()
+
+This means Plot must instantiated else we can't talk to it. 
+I think we should just make this the norm so we don't forget.
+
+>>>
+from com.tomfielden.util import *
+e = RandomVariable.Normal(0,1).sample(100)
+x = Variant.linspace(0,10,100)
+y = 2 + x + e
+Plot().plot(x,y).show()
+-or-
+Plot().show(x,y)     # this does not return the Plot() object
+-or-
+Plot(x,y)            # this DOES return the Plot() object
+p = Plot(x,y)        # shows immediately
+p.show()             # shows again.
+p.plot(x,2*y).show() # will retain the original (x,y) plot.
+
+### 10/6/2011 ###
+
+Now we have the weirdness that RandomVariable is static, but Plot() isn't.
+
+>>>
+from com.tomfielden.util import *
+e = RandomVariable.Normal(0,1).sample(100)
+Plot().show(e)
+
+We are sampling the Normal object, but we're showing the Plot object. 
+We could say: Display.Plot().show(e)
+But that's cumbersome. The difference is we want "Normal" scoped, but Plot not.
+
+Now we turn to OLS. This could be scoped by Regression. Let's just get OLS
+running first then we'll talk about more sophisticated structures.
+
+We need to figure out how we fill the X matrix in the first place. Then we can
+get a clue about how to feed it into external OLS. Presumably a data load.
+I suppose a data load of columns which we may want to filter select.
+
+Let's review how we import data into Variant then filter it into array 
+of columns. Then we'll see what's missing.
+
+>>>
+from com.tomfielden.util import *
+filename = "/home/tomf/sandbox/RticPHoX/test/Variant/MyDataset.csv"
+F = Variant.open(filename)          ## String_map
+F.keys()
+X = F[("CM5", "BAD_GOV")]           ## assuming some key names
+col = Variant(("CM5", "BAD_GOV"))   ## Variant construct not required.
+X = F[col]                          ## ARRAY of ARRAY
+X.type()
+# ARRAY
+X.shape()                           ## Won't work on STRING_MAP
+# (2,129)                           ## A shape object is an ARRAY
+
+Here's a neat trick: If STRING_MAP then plot each line with single style
+and labeled curves. If ARRAY of ARRAYs then plot each w/o labels.
+
+>>>
+from com.tomfielden.util import *
+filename = "/home/tomf/sandbox/RticPHoX/test/Variant/MyDataset.csv"
+F = Variant.open(filename)          ## String_map
+X = F[("CM5", "BAD_GOV")]           ## assuming some key names
+Plot(X, '+')                        ## works. missing decent names, though.
+
+I've thought about this before (dataprocessing.txt oct.2009). Let's try,
+
+>>>
+from com.tomfielden.util import *
+A = Variant({1:(1,2,3), 2:(4,5,6), 5:(7,8,9), 9:'duh'})
+B = Variant(set((1,2)))
+A[B]
+A = Variant({'Foo':(1,2,3), 'Bar':(4,5,6), 5:(7,8,9), 'Baz':'duh'})
+B = Variant(set(('Bar','Baz')))
+A[B]
+B = Variant.createStringSet(Variant(('Foo', 'Baz'))) ## cumbersome, but useful.
+A[B]
+
+
+>>> ### Minimal Jython version ###
+from com.tomfielden.util import *
+A = Variant({'Foo':(1,2,3), 'Bar':(4,5,6), 5:(7,8,9), 'Baz':'duh'})
+A[set(('Foo', 'Baz'))]
+## {Baz: duh, Foo: (1, 2, 3)}
+
+The order is not guaranteed since we're using a SET. 
+We do get a the subset within STRING_MAP we were looking for and shallow copy.
+
+>>>
+from com.tomfielden.util import *
+filename = "/home/tomf/sandbox/RticPHoX/test/Variant/MyDataset.csv"
+F = Variant.open(filename)          ## String_map
+Plot(F)                             ## A cocophany, but it works.
+
+The deal with regression is that we need to obtain the relevant arrays.
+Now we know that Variant can contain named (STRING_MAP) and arrays of ARRAY's.
+The latter may be better, but we need double[][] to use commons-math.
+
+If we switch on the type we're able to build up what is acceptable.
+We'll deal with the question of ONE, the unit vector in a bit. Should be simple-ish.
+
+I update Variant.createDoubleArray() so that is would accept double[] and double[][] 
+instead of just Double[]. Two internal functions changed.
+
+Now let's try out an OLS regression.
+
+>>>
+from com.tomfielden.util import *
+Years = Variant((97,93,88,81,75,57,52,45,28,15,12,11))
+DBA   = Variant((12.5,12.5,8.0,9.5,16.5,11.0,10.5,9.0,6.0,1.5,1.0,1.0))
+OLS   = RegressionFactory.OLS(DBA,Years)
+OLS.estimateRegressionParameters()
+
+>>>
+from com.tomfielden.util import *
+y = Variant((11, 12, 13, 14, 15, 16))
+x = Variant(((0,0,0,0,0),(2,0,0,0,0),(0,3,0,0,0),(0,0,4,0,0),(0,0,0,5,0),(0,0,0,0,6)))
+OLS = RegressionFactory.OLS(y,x)
+OLS.estimateRegressionParameters()
+
+And we can drop the Variant(...) wrapper now. Tuples can't be coerced to Variant's
+but we can overdefine the factory methods to allow this convenience.
+
+>>>
+from com.tomfielden.util import *
+Years = (97,93,88,81,75,57,52,45,28,15,12,11)
+DBA   = (12.5,12.5,8.0,9.5,16.5,11.0,10.5,9.0,6.0,1.5,1.0,1.0)
+OLS   = RegressionFactory.OLS(DBA,Years)
+OLS.estimateRegressionParameters()
+
+>>>
+from com.tomfielden.util import *
+y = (11, 12, 13, 14, 15, 16)
+x = ((0,0,0,0,0),(2,0,0,0,0),(0,3,0,0,0),(0,0,4,0,0),(0,0,0,5,0),(0,0,0,0,6))
+OLS = RegressionFactory.OLS(y,x)
+OLS.estimateRegressionParameters()
+
+This works, but the results are a little mysterious. I think there's an issue with
+the transpose of X. I'll need to pick up the Guj and start replicating. 
+
+### 10/7/2011 ###
+
+Recall from notes in back of Bickel Doksum that if X and Y are two centered RV's or
+samples (i.e. X-E(X)) then cov(X,Y) = <X,Y>.
+
+Recall that cov(X,Y) = E[(X-E[X])(Y-E[Y])].
+If X is a vector of samples then E[X] = sum(X)/num(X).
+Q) Then how do we get a Variance-Covariance matrix? 
+Q) What does X'X mean? If divided by N-K it's the VC matrix of X0, X1. 
+
+>>>
+from com.tomfielden.util import *
+Y = (1,1,3)
+X = (1,2,3)
+OLS = RegressionFactory.OLS(Y,X)
+OLS.estimateRegressionParameters()
+
+See p47 GPE.pdf
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/longley.csv")
+OLS = RegressionFactory.OLS(F["EM"]/1000, 100*F["GNP"]/F["PGNP"]/1000)
+OLS.estimateRegressionParameters()
+
+### 10/10/2011 ### 10/11/2011 ### 10/12/2011 ###
+
+from org.python.modules.math import *   ## for sqrt function
+
+See p943 (Appendix C.10) The Guj
+>>>
+from com.tomfielden.util import *
+from org.python.modules.math import *    # sqrt()
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/AppendixC.csv")
+OLS = RegressionFactory.OLS(F["Y"], F["X1", "X2"])
+OLS.Beta()             ## (300.2862573433232, 0.7419808312718775, 8.043562720280121)
+OLS.varError()         ## s^2 = 164.73794936748263
+sqrt(OLS.varError())   ## s   = 12.83502821841396
+OLS.seBeta()           ## (78.31762560242178, 0.04753374485107674, 2.9835456573697945)
+OLS.TSS();             ## 830121.3333333337
+OLS.ESS();             ## 828144.4779409239
+OLS.RSS();             ## 1976.8553924097914
+OLS.R2();              ## 0.9976185946402898
+OLS.R2adjusted();      ## 0.9972216937470048
+
+See p88 and p120 of The Guj
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/Chapter3.csv")
+OLS = RegressionFactory.OLS(F["Y"], F["X"])
+OLS.Beta();            ## Beta = (x'x)^{-1}x'y
+OLS.varError();        ## s^2 = u'u/(N-k)
+OLS.varBeta();         ## s^2 * (x'x)^{-1}
+OLS.seBeta();          ## sqrt(diag(varBeta))
+OLS.TSS();             ## Total Sum of Squares     = (y - ybar)'(y - ybar)
+OLS.ESS();             ## Estimated Sum of Squares = (x Beta - xbar Beta)'(ditto)
+OLS.RSS();             ## Residual Sum of Squares  = u'u
+OLS.R2();              ## R^2 = ESS/TSS
+OLS.R2adjusted();      ## Ra^2
+
+TODO:
+    double   getStructuralF(double RSS_ur);
+    double   getStructuralFp(double F);
+    MyVector getVarianceInflatingFactor(uint ones = 0); // ibid.
+
+    double   getGoldfeldQuandt(MyOlsModel&);
+    double   getBreuschPagan();
+    double   getWhiteLM(const MyArray& ma);
+
+See p145 of The Guj
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/Chapter3.csv")
+OLS = RegressionFactory.OLS(F["Y"], F["X"])
+OLS.tScores()  ## (3.812791090783815, 14.243171154216375)
+OLS.FScore()   ## 202.86792452830144
+OLS.pValues()  ## (0.002571086020846769, 2.8763730586245373E-7)
+OLS.probF()    ## 1.7671196150814694E-7
+
+We don't need to return Variant's all the time form within [OLS]Regression.
+Need more than two columns to test: OLS.TheilsMeasure()
+NEED to check K versus K-1, is the ONES column counted or not?
+
+Let's start replicating K.P.Lin
+
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/longley.csv")
+OLS = RegressionFactory.OLS(F["EM"]/1000, 100*F["GNP"]/F["PGNP"]/1000)
+OLS.Beta()
+OLS.probF()
+OLS.pValues()
+
+K is the total number of regressors INCLUDING the ones column.
+
+TODO: (based on KPLin Lesson 3.2 p.48)
+* Partial Regression
+* First-Order Rho (0.23785)
+* Durbin-Watson Test Statistic (1.4408)
+
+NOTE: Longley.txt also discussed in The Guj p371 (Chapter 10.10)
+      But, there's some slight differences.
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/longley.csv")
+EM = F["EM"]/1000
+RGNP = 100*F["GNP"]/1000/F["PGNP"]
+POPU = F["POP"]/1000
+X    = Variant((RGNP, POPU))
+OLS = RegressionFactory.OLS(EM, X)
+OLS.seY()         # 3.5119683559698176
+OLS.R2()          # 0.9743401666513192
+OLS.R2adjusted()  # 0.9703924999822914
+OLS.seError()     # 0.6042984262250596
+OLS.lnAPC()
+OLS.lnAIC()
+OLS.lnBIC()
+OLS.ESS()         # 180.26153035680508
+OLS.RSS()         # 4.747295643195089
+OLS.TSS()         # 185.00882600000017
+OLS.seBeta()      # [8.46309878589207, 0.013385672293716606, 0.11352700808113288]
+OLS.tScores()     # [5.866742257870288, 5.132218718597473, -0.7600097430165924]
+OLS.pValues()     # [5.530558778366058e-05, 0.00019256547081281106, 0.4608103828555139]
+OLS.varBeta()     # [71.62404105976782,    0.10763934042250069,    -0.9539975268751714]
+		  # [ 0.10763934042250069, 0.00017917622275477238, -0.0014896787139730137]
+		  # [-0.9539975268751714, -0.0014896787139730137,   0.01288838156385361]
+from org.python.modules.math import *    # sqrt()
+
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/longley.csv")
+EM   = F["EM"]
+PGNP = F["PGNP"]
+GNP  = F["GNP"]
+UEM  = F["UEM"]
+AF   = F["AF"]
+POP = F["POP"]
+YEAR = F["YEAR"]
+X   = Variant((PGNP, GNP, UEM, AF, POP, YEAR))
+OLS = RegressionFactory.OLS(EM, X)
+OLS.correlationData()  ## GOOD. But Overruled. See: Variant.correlation()
+
+BUT, as I said, it should not be part of OLS. Variant is a better home.
+>>>
+from com.tomfielden.util import *
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/longley.csv")
+Y = F["EM"]
+X = F[("PGNP", "GNP", "UEM", "AF", "POP", "YEAR")]
+X.sum()
+X.mean()
+X.variance()
+X.stdev()       ## (10.791553, 99394.9378, 934.464247, 695.9196, 6956.10156, 4.76095)
+X.correlation() ## ((1.0, 0.991589, 0.620633,  0.464744, 0.979163, 0.991149), 
+		##  (0.991589, 1.0, 0.604261,  0.446437, 0.991090, 0.995273), 
+		##  (0.620633, 0.604261, 1.0, -0.177421, 0.686552, 0.668257), 
+		##  (0.464744, 0.446437, -0.177421, 1.0, 0.364416, 0.417245), 
+		##  (0.979163, 0.991090,  0.686552, 0.364416, 1.0, 0.993953), 
+		##  (0.991149, 0.995273,  0.668257, 0.417245, 0.993953, 1.0))
+OLS = RegressionFactory.OLS(Y, X)
+OLS.pValues()
+
+The problem is that correlation is so special purpose. It assumes there is more than
+one array of values and that they are all parallel. This is where shape comes in.
+
+Tomorrow I write the definitive OLS description with Variant examples.
+Also, need to begin writing the Variant Manual. This will be continuously updated.
+
+The question with Variant is: what is the recursive understanding? Is it obvious?
+Why does it not appear to be formalized.
+What can be done about loading from a file? Should not be IN Variant.
+
+### 10/17/2011 ###
+
+Want the following from my documentation,
+1) Web-based
+2) MathML-enabled
+3) copy/paste-able jython code
+   3a) Even better, directly executable jython!
+       This is doable through an online app like WebPHoX
+
+LaTeX uses kpseXXX. We can then do: %>kpsepath tex | tr : '\n'
+
+It appears that Firefox is fully MathML-enabled so we just need to be able to target it.
+
+### 10/25/2011 ###
+
+--- tomf ---
+#!/usr/bin/env sh
+jython -i -c "from com.tomfielden.util import *"
+------------
+
+%>tomf
+>>>
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/longley.csv")
+Y = F["EM"]
+X = F[("PGNP", "GNP", "UEM", "AF", "POP", "YEAR")]
+OLS = RegressionFactory.OLS(Y, X)
+OLS.pValues()    ## [0.0035604, 0.86314, 0.3127, 0.00254, 0.000944, 0.826212, 0.003037]
+
+>>>
+F = Variant.open("/home/tomf/sandbox/RticPHoX/test/Econometrics/DraftData1970.csv")
+Y = F["Draft_No."]
+X = F["Day_of_year"]
+Z = RegressionFactory.Loess(X,Y)
+Plot().plot(X,Y,"+").plot(X,Z).show()
+
+### 11/04/2011 ###
+
+Introducing class Registry. It must have a global aspect to it so that when we talk to the "Registry" we talk to the global one. This means that we get Registry through a static method and it auto-constructs. Thus Registry hasa Mpa<String,Variant> and provides static accessors. 
+
+%>tomf
+R = Registry()
+v1 = Variant(5)
+k2 = Variant('bar')
+v2 = Variant('tomf')
+R['foo'] = v1
+R['bar'] = v2
+R[k2]
+R[5] = 6
+R['a'] = 'b'
+R[Variant('b')] = 'c'
+R['foo']
+
+Now we have a Registry we must instantiate to access even though we have a static global container.
+What if we hand this registry to someone else and we want to localize it for them?
+The client asks for the 'table' and expects a Variant corresponding to a specific data table, for ex.
+This means there must be a key/value pair they see, but that no one else can see, at least directly.
+Two options: create a subdirectory in the global map
+    	     Add a local map that has preferential access. BEST?
+
+Now the problem. How to populate the local map? It's like we need an inner class. We then have two instances of the specific registries. Then we can have the outer class to implement access policy. The two concepts are clashing. One must overshadow the other. The question is to how to populate the local registry?  We could create PublicResistry versus generic Registry. We still have this overshadowing feature outstanding. Really we need this as a separate concept. How can we hand someone a stacked map where we try to access an object in the specific level, but fall through to a lower, shall we say DEFAULT, level. A bi-level concept is what's needed. Thus Registry has a local map whereas PublicRegistry can be instantiated multiple times and only contains a static registry. The problem here is that we are redefining the accessor functions all over. It's almost 100% duplicate code. The only difference is that the map is static versus local. Just don't know at this point, but it's getting clearer.
+
+Here's the scoop. We create Registry w/ optional default where we pass in a Registry sort of like a copy constructor, but without the copy. No statics! In this way an interpreted module can be passes a Registry with specialized stuff as well as all the background stuff, if needed. The cascading comes from the default of a default.
+
+%>tomf
+D = Registry()
+D['a'] = 1
+D['b'] = 2
+R = Registry(D)
+R['b'] = 3
+R['c'] = 4
+S = Registry(R)
+S['c'] = 5
+S['d'] = 6
+
+%>tomf
+D = Registry()
+for i in range(1000): D['a'+str(i)] = i
+K = D.keys()
+
+Next, how do we execute interpreted code? Currently we have,
+
+    public static void registryInterpret(Variant key, Variant code_text) {
+	Variant code = interpret(code_text);
+	String  skey  = key.toString();
+	registrySet(skey, code.get(skey));  // Assume code contains named structure.
+    }
+
+    PythonInterpreter interp = new PythonInterpreter();
+    // inject given variables
+    for(String k: v2.toStringSet()) interp.set(k, v2.get(k));
+    interp.exec(v1.toString());
+    return new Variant(interp.getLocals()); // was cast to (PyStringMap)
+
+The code text needs to be handed a Regsitry rather than having a profusion of special variables. Then we pass the code string to the interpreter for execution and get a string_map serving as output. What we get is all the surviving local variables. The result is a variant that is actually a StringMap type Variant.
+
+What else do we need the Interpreter to do? It's a pretty simple object.
+
+%>tomf
+R = Registry()
+R['a'] = 5
+R['b'] = (1,2,3)
+I = Interpreter.Interpret(R, "c = a + b; d = a/b")
+I['c']   ## (6,7,8)
+
+Getting close. We need to define / refine set subtraction for StringMap (and sets).
+Shouldn't Regsitry now be isa Variant?
+
+Registry is now nothing more than a StringMap variant with a copy constructor.
+
+### 11/07/2011 ###
+
+Can import (static) functions into Jython! Suppose,
+class com.tomfielden.util.Interpreter {
+      public static int foo(int i) {return i+3;}
+}
+
+Then,
+
+>>> from com.tomfielden.util.Interpreter import *
+>>> foo(4)
+7
+
+Yea! Let's get busy! Let's create a Functions.java class that holds the cool functions. This superceded the Interpreter. Not sure about the global regsistry...removed.
+
+%>tomf
+R = Registry()
+R['a'] = 5
+R['b'] = (1,2,3)
+I = interpret(R, "c = a + b")
+I['c']   ## (6,7,8)
+
+We need to inject then remove all the java functions from the locals in the interpreter.
+
+%>tomf
+R = Registry()
+R['a'] = 5
+I = interpret2("b = arange(a)", R)
+interpret("a = NPV(.25, 10)")
+
+Works! 
+
+Now we need to move the "Variant.open()" function for Functions. Let's try it out,
+
+%>tomf
+filename = "/home/tomf/sandbox/RticPHoX/test/Variant/MyDataset.csv"
+F = open(filename)                  ## String_map
+F.keys()			    ## <31> strings
+X = F[("CM5", "BAD_GOV")]           ## assuming some key names
+col = Variant(("CM5", "BAD_GOV"))   ## Variant construct not required.
+X = F[col]                          ## ARRAY of ARRAY
+X.type()                            # ARRAY
+X.shape()                           # (2, 129)
+
+%>tomf
+F = open("/home/tomf/sandbox/RticPHoX/test/Econometrics/DraftData1970.csv")
+Y = F["Draft_No."]
+X = F["Day_of_year"]
+Z = RegressionFactory.Loess(X,Y)
+Plot().plot(X,Y,"+").plot(X,Z).show()
+
+Need compound interest rate. Ex. r = 4.3% quarterly compounding of $1500 for 6 years.
+Need to add one period to show the final amount since we find amount at start of period (year = 0).
+
+%>tomf
+#OBSOLETE: compound_growth(0.043/4, 4*6+1)*1500     # (1500.00, ..., 1938.8368221341054)
+1500*(1+0.043/4)**linspace(0,4*6,4*6+1)
+
+### 11/08/2011 ###
+
+How do we load a 2D lookup? More to the point, how do we represent one? A 2D lookup is of form
+
+col0, col1, col2, col3, ...
+row1  x11   x12  x13
+row2  x21   x22  x23
+row3  x31   x32  x33
+...
+
+There are 3 possibilities: The rows share a type, the cols share a type or not. 
+First we load the file and capture each cell.
+
+%>tomf
+L = Lookuptable("/home/tomf/sandbox/RticPHoX/test/File/scenerios.csv")
+
+For the scenerios.csv test file we use as follows. We pick a column like "Case 2" and expect to associate the row header with each value. We can try to convert number-like string to numbers. It's still a double string map. table = StringMap<column_name, columns> and columns = StringMap<row_name, cell>
+
+Since the internal m_array is column-first, we walk each element and harvest the first element as column-key. The very first one is special. We harvest each value as a row-key. 
+
+%>tomf
+L = Lookuptable("/home/tomf/sandbox/RticPHoX/test/File/scenerios.csv")
+X = L.get2DColumnLookup()
+X['Case 12']['Step1:B10']
+
+### 11/09/2011 ###
+
+Let's try out the functions we anticipate for Boston2012/EPA.
+
+ %>tomf
+arange2(1,30)                           ## (1,2,...,30)
+arange(30)+1                            ## (1,2,...,30)
+1500*(1+0.043/4)**arange(4*6+1)         ## (1500.0, ..., 1938.8368221341054)
+where(arange(5)>2,10,1.02**arange(5))   ## (1.0, 1.02, 1.0404, 10, 10)
+
+Need to change the definition of "diff". It should not prepend a copy of the first element. That's just not right. We can create diff0 and diff1 to mean prepend a 0 or prepend 1st element.
+
+%>tomf
+diff ((2,3,7,9))      # (1,4,2)
+diff0((2,3,7,9))      # (0,1,4,2)
+diff1((2,3,7,9))      # (2,1,4,2)
+
+So far have the concept of a 1D (Boolean[]) mask, but not an nD. Do we need this? Not clear from the case we're studying. Could it be an array of masks?
+
+Need a banded upper triangular (sparse) matrix we can multiply by an array.
+This is a "sideband" concept. A "zero" sideband is an I matrix. Negative for upper, positive for lower.
+
+%>tomf
+createSparseMatrix(5,5,-2)
+1.0 1.0 1.0        
+    1.0 1.0 1.0    
+        1.0 1.0 1.0
+            1.0 1.0
+                1.0
+
+ISSUE: div() returns a VECTOR. This may not be what we want. Is a vector simply an array of doubles? Not clear!
+
+Added: cumsum(PyObject A)
+
+Datafile now OBSOLETE. Use >>> Lookuptable(<file>).getColumnMap()
+Added ave() which is actually mean().
+
+### 11/12/2011 ###
+
+We have the following configuration ||=== and want ||:|
+First we can generate the === based on |.
+%>tomf
+I = arange2(1,4)
+X = (2, 5)
+X ** I
+Should be (2**I, 5**I)
+
+The issue is that pow(<array>, <array>) should return an array or arrays. What if we meant the arrays to be parallel and we wanted a 1D array result? 
+
+2 ** (1,2,3) = (2, 4, 8)
+(1,2,3) ** 2 = (1, 4, 9)
+(1,2,3) ** (4,5,6) = ??  (1, 23, 729) is what we get.
+                   = (1, 16, 81 )     is what we want? But multiplication doesn't work this way.
+                     (1, 32, 243)
+                     (1, 64, 729)
+
+NB: pow(A,B) is outer-oreiented, that is, (2,3)^(4,5,6) ~ 2x3 array
+
+%>tomf
+B = Variant((4,5,6))
+2**B                   # [16,32,64] ~ INDEX
+2.0**B                 # [16.0, 32.0, 64.0] ~ VECTOR
+(1,2)**B               # ([1,1,1],[16,32,64]) ~ ARRAY,INDEX
+(1,2.0)**B             # ([1,1,1],[16.0,32.0,64.0]) ~ ARRAY,(INDEX,VECTOR)
+A = Variant((1,2,3))
+A**2                   # [1,4,9] ~ INDEX
+A**2.0                 # [1.0,4.0,9.0] ~ VECTOR
+A**B                   # ([1, 1, 1], [16, 32, 64], [81, 243, 729]) ~ ARRAY,INDEX
+
+Let's work out the stack() and transpose() or T() operations.  
+
+%>tomf
+P = Variant((1.,2.,3.))
+I = arange2(1,4)
+A = P**I               # ((1, 1, 1, 1), (2, 4, 8, 16), (3, 9, 27, 81))
+A.T()                  # ((1, 2, 3), (1, 4, 9), (1, 8, 27), (1, 16, 81))
+A.T().stack()          # ((1, 1, 1, 1), (2, 4, 8, 16), (3, 9, 27, 81))
+A.T().cat()            # (1, 2, 3, 1, 4, 9, 1, 8, 27, 1, 16, 81)
+
+Stack is a superset of transpose(). The problem is that some arrays are non-rectangular and then what? I think we want to focus on cat().
+
+cat() collapses arrays one level through concatenation.
+
+Define cat() Symbolically, 
+(-,-,-)                 =cat> (---)
+(=,=,=)                 =cat> (===)
+({a:-,b:=}, {a:-,b:=})  =cat> {a:--, b:==}
+([3,5],[4,5])           =cat> [7x5]           # stack the 2D array columns should result
+(.,-) ~ (1,(2,3,4))     =cat> (1,2,3,4)
+(-,=,=)                 =cat> (:==)           if ([2],[2,N],[2,M]), for example.
+
+We need to determine which case we're in. If the elements are 0- or 1-D then we need to decide if all the elements are the same type (and what type) or hetero. So we first check for conformality and if the dimensions agree. 
+
+### 11/14/2011 ###
+
+Implement cat(). We need to identify the length and type of the final array. We build an array of shapes.
+
+%>tomf
+A1 = Variant(4)
+A2 = Variant((1,2,3))
+As = Variant((A1, A2))
+As.cat()                         # (4, 1, 2, 3)
+B0 = Variant(0)
+B1 = Variant((1,2))
+B2 = Variant(((1,2,3),(3,4,5)))
+B3 = Variant(((7,8), (9,10)))
+Bs = Variant((B1, B2, B0, B3))
+Bs.cat()                          # ((1, 1, 2, 3, 0, 7, 8), (2, 3, 4, 5, 0, 9, 10))
+
+%>tomf
+cat(( 0, ((1,2,3),(4,5,6)) ))     # ((0, 1, 2, 3), (0, 4, 5, 6))
+cat(( (1,2), ((3,4,5),(6,7,8)) )) # ((1, 3, 4, 5), (2, 6, 7, 8))
+
+### 11/17/2011 ###
+
+Here's the code we'd like to see:
+
+%>tomf
+Foo = call('test/Function/A_plus_B.py', {'A':5, 'B':7})
+Foo['c']   # 5 + 7 = 12 
+
+where,
+
+[A_plus_B.py] contains,
+c = A+B
+
+NB: can't return CAPITAL variables
+
+### 11/21/2011 ###
+
+&>tomf
+I = createSparseMatrix(4,4,0)
+L = createSparseMatrix(4,4,4)
+H = (L - I)*L
+H
+0
+1 0
+2 1 0
+3 2 1 0
+5 ** H + I
+NB: 5 ** <blank> = 0. THIS IS WEIRD, but naturally computed.
+
+### 11/22/2011 ###
+
+There are two functions to build if we don't have them,
+
+  P * r ** arange2(1,n) = P * (r, r^2, r^3, ..., r^n) ---- we obviously do this already.
+
+Example
+>>> 17 * 1.016 ** arange2(1,5)  
+
+The other function is; (x1, x1*r+x2, x1*r^2+x2*r+x3,..., x1*r^n + x2*r^{n-1} +..+ xn)
+We should redefine DCF to NOT sum the array. We have something different here. We have cumulative cash flow,
+CCF(r,(x1, x2, ..., xn)) = (x1, x1*r + x2, ..., x1*r^{n-1}+x2*r^{n-2}+...+xn)
+
+### 11/28/2011 ###
+
+I had started to build RandomVariableFactory, but it's just a doodle for now.
+What I want is to build RandomVariable into Variant as a top-level object. It's body lives in ./random rather than ./util just like ./plotting and ./regression.
+
+I think I need to split out the parts of RandomVariable like Continuous and Discrete, etc. Also, the Functions.java file should include all the representations like Normal, LogNormal, etc, but these are Variants that contain the RandomVariable object which is polymorphic like Variant itself.
+
+%>tomf
+N = Normal(0,1,250)
+
+Now we do plotting. How do we plot a RandomVariable? So far it's taken an intermediate file and an external Gnuplot reading. We need to figure out how to get SimplePlot to show continuous histograms, discrete plots and both without making a second graph. We need a pair of Variants that are each convertable to double arrays. We should look at styles. Heights should be present in Y...
+
+To do the plot we need access to the ContinuousRandomVariable and DiscreteRandomVariable from Variant. This is uncomfortable, but we do know we're dealing with RandomVariable at least. Can we ask for ArrayPairs? We just grabbed the raw data since it was available as a pair of pairs of arrays. Used the "f" style for the continous case with an rshift of heights.
+
+Now we need the LogNormal(m,s,n). It's not in Apache.Commons.
+
+%>tomf
+L = LogNormal(0,1,25)
+Lrv = L.getRandomVariable()
+Lrv.P()
+
+NB:
+>>> L = LogNormal(0,1,250)
+>>> Plot().plot(L).plot(L**2).plot(L*L).show()
+L**2 and L*L are DIFFERENT! We want L*L since sequence of independent products.
+
+%>tomf
+L = LogNormal(.02,.05,1000)
+L2 = L*L
+L4 = L2*L2
+L8 = L4*L4
+L16 = L8*L8
+L24 = L8*L16
+L28 = L24*L4
+L30 = L28*L2
+Plot().xrange(.5,3.5).plot(L,'','L').plot(L8,'','L^8').plot(L16,'','L^16').plot(L30,'','L^30').show()
+
+Now want to save to a file...
+Plot().xrange(.5,3.5).plot(L,'','L(0.02,0.05)').plot(L8,'','L^8').plot(L16,'','L^16').plot(L30,'','L^30').save("~/junk/L30.png")
+
+Plot().xrange(.5,3.5).plot(L**30,'','L(0.02,0.05)^30').plot(L30,'','L*...*L [30]').show()
+
+%>tomf
+L = LogNormal(.02,.05,1000)
+Plot().plot(L).plot(3/L).show()
+Plot(3+L)
+Plot(L.log())
+L.ave()
+L.sum()  == probability of L
+
+The comparison operators can be overloaded. Not sure what to do in fact. We can do average/mean can variance. We can do sum ~ probability. The problem is that cmp should return -1,0,1 in each flavor. Not good. I want a way to split the random variable and find it's probability. The thing is that RV's are usually not strictly greater or less than a number. They can compare to each other. That's interesting too. Wait! This could work. X < 5 ... means what? Better wait for a bit.
+
+When we see "X < 5" where X is a random variable, we do not expect the result to be a probability value. We have, in fact, expressed an event. This event has a probability value. I can't represent events so the result must be "X < 5" == P(X < 5). Does this hold for "X < Y"? The implication of this statement is a random variable with a particular partition along the diagonal. The distinction between "X <= 5" and "X < 5" is lost for purely continuous random variables, but not for RandomVariables which may be partially discrete. Let's start laying the groundwork. But first, what does 3 < 5 mean?
+
+cmp(3,5) asserts 3 > 5 and returns -1 since false
+cmp(3,3) asserts 3 > 3 and is true, but then tries 3 < 3 and since also true returns 0
+BUT WE DON'T CARE. We define X < Y for ourselves as probability.
+
+%>tomf
+L = LogNormal(.02,.05,1000)
+L < 2
+
+%>tomf
+A = RandomVariable.Continuous((1,2,3),(10,20))
+B = RandomVariable.Continuous((4,5,6),(40,50))
+RandomVariable.force_partition((4,8,12,18))
+A*B
+#()
+#(4.0(543.3455913812901)8.0(1086.691182762579)12.0(1069.9632258561307)18.0,)
+
+%>tomf
+L = LogNormal(.02,.05,1000)
+M = LogNormal(.03,.05,1000)
+L < M    # works
+L > M    # failed, but patched. The RandomVariable.GT(0) seems to be failing...ERROR
+
+Works. Need median().
+
+### 12/05/11 ###
+
+Let's deal with depreciation better. Suppose we buy something for P dollars in year 1 and depreciate it D over 3 years, then we claim,
+
+P = (6,0,0,0,0)
+D = (2,2,2,0,0)
+
+If we buy a sequence of things then we have,
+
+P = (6,12,3,0,0,0)
+D = (2,2, 2,0,0,0) + (0,4,4,4,0,0) + (0,0,1,1,1)
+  = (2,6, 7,5,1,0)
+
+This is a limited cumulative sum. Call is cumsum2(P,3) since a lifetime is provided. Consider CCF(), it does a cumulative sum with growth. Shouldn't we do both? No, we'll convert to nominal dollars later. What we need is various depreciation schedules. The limited cumulative sum corresponds to straigh line depreciation. How do we do an accelerated deprecitation? I think it's a convolution!  If we allow unequal lengths then we're all set! 
+
+convolve((1/3.,1/3.,1/3.), (6,12,3,0,0,0)) -> (2,6,7,5,1,0)
+convolve(1/3. * ones(3),   (6,12,3,0,0,0))
+
+f * g (t) := INT f(t-x)g(t)dx
+f * g (n) := SUM_m f(n-m)g(m)
+
+We also need min((2,3,4)) == 2. Actually, we can't do this since we have already defined min(x,y), can't overdefine. OK.
+
+I want to change how convolution is defined (a bit). Traditionally we return an array that is the sum of the lengths of the two input arrays. That's not going to work as well for deperciation. And besides, I don't like changing the length of arrays. Their length is often significant. Instead we truncate to the max length of the input arrays. If you want the "real" definition, then pad the "long" array with zeros. 
+
+%>tomf
+convolve((1/3.,1/3.,1/3.), (6,12,3,0,0,0))
+
+Need choose(n,k) for binomial coeficiants.
+
+### 12/06/11 ###
+
+Given an asset value of some initial amount Vo that depreciates according to some schedule d = (d0,d1,..,dk), sum(d) == 1
+We need to accumulate d to cd = cumsum(d). The amount of money we must apply to service our asset Vo is,
+
+V1 = Vo - Vo(i)
+...
+Vn = Vo - Sum[i=0..n-1] Vi(n-i)  where Vi(t) = Vi * (1 - cd(t)) else 0 if fully depreciated (t > cd_T)
+
+W = asset_service(400,ones(20)/20,100)  # $400 over 20 years (straight-line) for 100 years
+X = asset_service((100,100,100,100),ones(20)/20,100)
+
+Here's the 20-year half-year accelerated depreciation schedule from: http://taxguide.completetax.com/tools/deptables_m.asp
+%>tomf
+MACRS = Variant((3.750,7.219,6.677,6.177,5.713,5.285,4.888,4.522,4.462,4.461,4.462, 4.461,4.462,4.461,4.462,4.461,4.462,4.461,4.462,4.461,2.231)) / 100
+Y = asset_service(400,ones(30)/30,100) # $400 over 30 years (straight-line) for 100 years
+Payments = cat((400,Y[:-1]))
+M = convolve(MACRS, Payments)
+Plot().plot(M,'-',"MACRS 20-year").plot(Y,'-',"30 year straight-line").show()
+
+### 12/07/2011 ###
+
+A higher-level function for asset_service...
+
+V0 = Vo
+V1 = Vo - VoC0
+V2 = Vo - VoC1 - V1C0
+V3 = Vo - VoC2 - V1C1 - V2C0
+V4 = Vo - VoC3 - V1C2 - V2C1 - V3C0
+V5 = Vo - VoC4 - V1C3 - V2C2 - V3C1 - V4C0,
+V6 = Vo - VoC5 - V1C4 - V2C3 - V3C2 - V4C1 - V5C0,
+V7 = Vo - V1C5 - V2C4 - V3C3 - V4C2 - V5C1 - V6C0,  Sp T = 6, first "regular" case (lifetime limited)
+V8 = Vo - V2C5 - V3C4 - V4C3 - V5C2 - V6C1 - V7C0
+...
+Vn = Vo - V{n-5}C4 - V{n-4]C3 - V{n-3}C2 - V{n-2}C1 - V{n-1}C0, General regular case
+
+Now we try to unroll it and look for a pattern. And we'll force Vo to 1
+
+
+V0 = 1
+V1 = 1 - C0
+V2 = 1 - C1 - V1C0
+   = 1 - C1 - (1 - C0)C0
+   = 1 - C1 - C0 + C0^2
+V3 = Vo - VoC2 - V1C1 - V2C0
+   = 1 - C2 - (1 - C0)C1 - (1 - C1 - C0 + C0^2)C0
+   = 1 - C2 - C1 + C0C1 - C0 + C1C0 + C0^2 - C0^3  # light touch
+   = 1 - C2 - C1 - C0 + 2C0C1 + C0^2 - C0^3        # scrunched
+V4 = Vo - VoC3 - V1C2 - V2C1 - V3C0
+   = 1 - C3 - (1 - C0)C2 - (1 - C1 - C0 + C0^2)C1 - (1 - C2 - C1 + C0C1 - C0 + C1C0 + C0^2 - C0^3)C0
+   = 1 - C3 - (C2 - C0C2) - (C1 - C1C1 - C0C1 + C0^2C1) - (C0 - C2C0 - C1C0 + C0^2C1 - C0^2 + C0^2C1 + C0^3 - C0^4)
+   = 1 - C3 - C2 + C0C2 - C1 + C1C1 + C0C1 - C0^2C1 - C0 + C2C0 + C1C0 - C0^2C1 + C0^2 - C0^2C1 - C0^3 + C0^4
+   = 1 - C3 - C2 - C1 - C0  + C0C2 + C1C1 + C2C0  + C0C1 + C1C0  - C0^2C1 - C0^2C1 + C0^2 - C0^2C1 - C0^3 + C0^4
+   = 1 - (C3 + C2 + C1 + C0)  + 2C0(C2  + C1 + C0) - 3C0^2C1 - C0^2 + C1^2 - C0^3 + C0^4
+V5 = 1 - C4 - V1C3 - V2C2 - V3C1 - V4C0
+   = 1 - C4 - (1 - C0)C3 - (1 - C1 - C0 + C0^2)C2 - (1 - C2 - C1 - C0 + 2C0C1 + C0^2 - C0^3)C1 
+     - (1 - C3 - C2 - C1 - C0  + 2C0(C2  + C1 + C0) - 3C0(C0C1) - C0^2 + C1^2 - C0^3 + C0^4)C0
+   = 1 - C4 - (C3 - C0C3) - (C2 - C1C2 - C0C2 + C0^2C2) - (C1 - C1C2 - C1^2 - C0C1 + 2C0C1^2 + C0^2C1 - C0^3C1)
+     - (C0 - C0C3 - C0C2 - C0C1 - C0^2  + 2C0^2(C2  + C1 + C0) - 3C0^2(C0C1) - C0^3 + C0C1^2 - C0^4 + C0^5)
+   = 1 - C4 - C3 + C0C3 - C2 + C1C2 + C0C2 - C0^2C2 - C1 + C1C2 + C1^2 + C0C1 - 2C0C1^2 - C0^2C1 + C0^3C1
+     - C0 + C0C3 + C0C2 + C0C1 + C0^2  - 2C0^2(C2  + C1 + C0) + 3C0^2(C0C1) + C0^3 - C0C1^2 + C0^4 - C0^5
+   = 1 - C4 - C3 + C0C3 - C2 + C1C2 + C0C2 - C0^2C2 - C1 + C1C2 + C1^2 + C0C1 - 2C0C1^2 - C0^2C1 + C0^3C1
+     - C0 + C0C3 + C0C2 + C0C1 + C0^2  - (2C0^2C2  + 2C0^2C1 + 2C0^3) + 3C0^3C1 + C0^3 - C0C1^2 + C0^4 - C0^5
+   = 1 - C4 - C3 + C0C3 - C2 + C1C2 + C0C2 - C0^2C2 - C1 + C1C2 + C1^2 + C0C1 - 2C0C1^2 - C0^2C1 + C0^3C1
+     - C0 + C0C3 + C0C2 + C0C1 + C0^2  - 2C0^2C2  - 2C0^2C1 - 2C0^3 + 3C0^3C1 + C0^3 - C0C1^2 + C0^4 - C0^5
+   = 1 - (C4 + C3 + C2 + C1 + C0) + 2C0(C3 + C2 + C1 + C0) - 3C0^2(C1 + C2) - C0^2 + C1^2 - C0^3 + C0^4 - C0^5 + 2C1C2 
+     - 3C0C1^2 + 4C0^3C1
+V6 = Vo - VoC5 - V1C4 - V2C3 - V3C2 - V4C1 - V5C0,
+   = 1 - C5 - (1 - C0)C4 - (1 - C1 - C0 + C0^2)C3 - (1 - C2 - C1 - C0 + 2C0C1 + C0^2 - C0^3)C2
+     - (1 - (C3 + C2 + C1 + C0)  + 2C0(C2  + C1 + C0) - 3C0^2C1 - C0^2 + C1^2 - C0^3 + C0^4)C1
+     - (1 - (C4 + C3 + C2 + C1 + C0) + 2C0(C3 + C2 + C1 + C0) - 3C0^2(C1 + C2) - C0^2 + C1^2 - C0^3 + C0^4 - C0^5 
+        + 2C1C2 - 3C0C1^2 + 4C0^3C1)C0
+   = 1 - C5 - (C4 - C0C4) - (C3 - C1C3 - C0C3 + C0^2C3) - (C2 - C2^2 - C1C2 - C0C2 + 2C0C1C2 + C0^2C2 - C0^3C2)
+     - (C1 - (C1C3 + C1C2 + C1^2 + C0C1)  + 2C0C1(C2  + C1 + C0) - 3C0^2C1^2 - C0^2C1 + C1^3 - C0^3C1 + C0^4C1)
+     - (C0 - (C0C4 + C0C3 + C0C2 + C0C1 + C0^2) + 2C0^2(C3 + C2 + C1 + C0) - 3C0^3(C1 + C2) - C0^3 + C0C1^2 - C0^4 + C0^5 
+     - C0^5 + 2C0C1C2 - 3C0^2C1^2 + 4C0^4C1)
+   = 1 - C5 - C4 + C0C4 - C3 + C1C3 + C0C3 - C0^2C3 - C2 + C2^2 + C1C2 + C0C2 - 2C0C1C2 - C0^2C2 + C0^3C2
+     - C1 + C1C3 + C1C2 + C1^2 + C0C1  - 2C0C1(C2  + C1 + C0) + 3C0^2C1^2 + C0^2C1 - C1^3 + C0^3C1 - C0^4C1
+     - C0 + (C0C4 + C0C3 + C0C2 + C0C1 + C0^2) - 2C0^2(C3 + C2 + C1 + C0) + 3C0^3(C1 + C2) + C0^3 - C0C1^2 + C0^4 - C0^5 
+     + C0^6 - 2C0C1C2 + 3C0^2C1^2 - 4C0^4C1
+   = 1 - C5 - C4 + C0C4 - C3 + C1C3 + C0C3 - C0^2C3 - C2 + C2^2 + C1C2 + C0C2 - 2C0C1C2 - C0^2C2 + C0^3C2
+     - C1 + C1C3 + C1C2 + C1^2 + C0C1  - 2C0C1C2  - 2C0C1C1 - 2C0C1C0 + 3C0^2C1^2 + C0^2C1 - C1^3 + C0^3C1 - C0^4C1
+     - C0 + C0C4 + C0C3 + C0C2 + C0C1 + C0^2 - 2C0^2C3 - 2C0^2C2 - 2C0^2C1 - 2C0^2C0 + 3C0^3C1 + 3C0^3C2 + C0^3 - C0C1^2 
+     + C0^4 - C0^5 + C0^6 - 2C0C1C2 + 3C0^2C1^2 - 4C0^4C1
+   = 1 - C5 - C4 - C3 - C2 - C1 - C0 + 2C0(C4 + C3 + C2 + C1 + C0) - C0^2 + C1^2 + C2^2 - C0^3 - C1^3 + C0^4 - C0^5 + C0^6
+     - 3C0^2(C3 + C2 + C1 - C1^2) + 4C0^3(C2 + C1) + 2C1(C2 + C3)
+     - C0C1^2 - 8C0C1C2 - 5C0^4C1 + 3C0^2C1^2
+
+OK, I give up for now. There's obviosly a pattern, but I'm not seeing a clear path to it at this point.
+The code for the steady-state is ready,
+
+%>tomf
+Y  = asset_service(400,ones(20)/20,1000)      # $400 over 20 years (straight-line) for 1000 years
+Yf = asset_service_steady_state(400,ones(20)/20)
+abs(Y[-1] - Yf)
+
+The forula for steady-state is,
+
+Vf = Vo / (T - Sum[i=0..T-2](T-1-i)*d[i])
+
+The special case for straight-line depreciation is then,
+
+Vf' = 2 Vo / (T + 1)
+
+Given a CapEx of 19733.33333333 we have an implied straight-line depreciation of 39.5 years. Following the half-year convention this is effectively 40 years.
+
+
+OK. New Plan. 
+
+V0 = 1   d1   d2   d3   d4   d5   d6   d7   d8   d9   d{10}
+V1 =     d1   d1^2 d1d2 d1d3 d1d4 d1d5 d1d6 d1d7 d1d8 d1d9
+V2 =          Sum  V2d1 V2d2 V2d3 V2d4 V2d5 V2d6 V2d7 V2d8
+V3 =               Sum  V3d1 V3d2 V3d3 V3d4 V3d5 V3d6 V3d7
+V4 =                    Sum  V4d1 V4d2 V4d3 V4d4 V4d5 V4d6
+V5 =                         Sum  V5d1 V5d2 V5d3 V5d4 V5d5
+V6 =                              Sum  V6d1 V6d2 V6d3 V6d4
+V7 =                                   Sum  V7d1 V7d2 V7d3
+V8 =                                        Sum  V8d1 V8d2
+V9 =                                             Sum  V9d1
+V10=                                                  Sum
+
+V1 = d1
+V2 = d2 + d1^2
+V3 = d3 + d1d2 + V2d1
+V4 = d4 + d1d3 + V2d2 + V3d1
+V5 = d5 + d1d4 + V2d3 + V3d2 + V4d1
+V6 = d6 + d1d5 + V2d4 + V3d3 + V4d2 + V5d1
+V7 = d7 + d1d6 + V2d5 + V3d4 + V4d3 + V5d2 + V6d1
+V8 = d8 + d1d7 + V2d6 + V3d5 + V4d4 + V5d3 + V6d2 + V7d1
+V9 = d9 + d1d8 + V2d7 + V3d6 + V4d5 + V5d4 + V6d3 + V7d2 + V8d1
+
+NB: If we shift the subscripts such that d is 1-based we see an interesting pattern... They sum to n as in,
+    In fact the pattern persists. d32d6 == d_2^2 * d_5 => 2*2+5 = 9 this is because we sum the substripts of all terms
+    and d32 = d3^2 = d3*d3 which sums to 4. Looking back this is true by construction!
+
+NB: When there are two d-terms we sum the exponents to find the coefficient. Always? Single tems have no coefficient.
+
+V1 = d1
+V2 = d2 + d12                        NB: d12 == d1^2 since single digits only
+V3 = d3 + d1d2    + (d2 + d12)d1
+   = d3 + 2d1d2   + d13
+V4 = d4 + d1d3    + (d2+d12)d2 + (d3 + 2d1d2 + d13)d1
+   = d4 + 2d1d3         
+        + 3d12d2  + d22 
+	+ d14
+V5 = d5 + 2d1d4   + 2d2d3          
+     	+ 3d12d3  + 3d1d22 
+        + 4d13d2  
+	+ d15
+V6 = d6 + 2d1d5   + 2d2d4     + d32        
+     	+ 3d12d4  + 6d1d2d3   + d23         
+	+ 4d13d3  + 6d12d22  
+        + 5d14d2  
+	+ d16
+V7 = d7 + 2d1d6   + 2d2d5     + 2d3d4                      
+        + 3d12d5  + 6d1d2d4   + 3d1d32    + 3d22d3         
+        + 4d13d4  + 12d12d2d3 + 4d1d23   
+        + 5d14d3  + 10d13d22  
+        + 6d15d2  
+        + d17
+V8 = d8 + 2d1d7   + 2d2d6     + 2d3d5     + d42     
+     	+ 3d12d6  + 6d1d2d5   + 6d1d3d4   + 3d22d4    + 3d2d32  
+	+ 4d13d5  + 12d12d2d4 + 12d1d22d3 + 6d12d32   + d24
+	+ 5d14d4  + 20d13d2d3 + 10d12d23 
+        + 6d15d3  + 15d14d22 
+        + 7d16d2  
+        + d18
+V9 = d9 + 2d1d8   + 2d2d7     + 2d3d6     + 2d4d5    
+     	+ 3d12d7  + 6d1d2d6   + 6d1d3d5   + 6d2d3d4    + 3d1d42    + 3d22d5    + d33     
+	+ 4d13d6  + 12d12d2d5 + 12d12d3d4 + 30d12d22d3 + 12d1d22d4 + 12d1d2d32 + 4d23d3  
+	+ 5d14d5  + 20d13d2d4 + 10d13d32  + 5d1d24   
+	+ 6d15d4  + 30d14d2d3 + 20d13d23  
+	+ 7d16d3  + 21d15d22   
+	+ 8d17d2
+	+ d19
+     
+
+NB: The coefficients are mearly the multiplicity of the arguments. Ex: d13d32 ~ (1,1,1,3,3)
+    whose multiplicity is 5! / (3!2!) = 10.
+
+What remains is to find how to enumerate all the ways to sum depreciation periods to n.
+The stopping point is when we cross some subscript threshold representing the lifetime of the asset.
+Let's group by number of terms in the expression.
+We have a "Integer Partition (Number Theory) problem". Since order matters (we'll count it up) it's a composition.
+Thus V9 is found by decomposing 9 into it's components.
+There are 2^(n-1) distinct compositions of n.
+
+EX: For V5 was have 5 => (5, 1+4, 2+3, 1+1+3, 1+2+2, 1+1+1+2, 1+1+1+1+1) order-dependent compositions, with 2^(5-1) = 16 compositions.
+    Notice that 1+4 and 4+1 are distinct composions of 5, but constitute a single partition. 
+    In our case, we regard 1+4 and 4+1 and different we want order-dependent compositions.
+
+The "partition function p(n)" tells us how many partitions there are. For example p(8) = 22 and we see V8 has 22 terms. How about that?
+In fact, p(1..10) = 1, 2, 3, 5, 7, 11, 15, 22, 30, 42. These match the above exactly.  
+Be careful, There are 190,569,292 partitions of the number 100, and approximately 2.4×10^31 partitions of the number 1000.
+
+NB::::::
+We're now going to return the initial 400 in the asset_service function. 
+
+%>tomf
+Y  = asset_service(400,ones(20)/20,100)
+Yf = asset_service_steady_state(400,ones(20)/20)
+
+%>tomf
+MACRS = Variant((3.750,7.219,6.677,6.177,5.713,5.285,4.888,4.522,4.462,4.461,4.462, 4.461,4.462,4.461,4.462,4.461,4.462,4.461,4.462,4.461,2.231)) / 100
+CF = asset_service(400,ones(39)/39,100)
+M  = convolve(MACRS, Y)
+Plot().plot(M,'-',"MACRS 20-year").plot(CF,'-',"30 year straight-line").show()
+
+We've updated our depreciation functions a bit. Now we say that if we are given a sequence of cash flows and a depreciation schedule we can use our asset_service function to return the sequence of cash flows that will maintain the asset value in each period as follows,
+
+So, given a sequene of cash flows CF we can find the cash flow value in the face of depreciation. If we get our cash flows from the asset_service function then we should maintain a constant value again,
+
+%> tomf
+d  = ones(39)/39
+CF = asset_service(400,d,100)
+V  = CFV(CF,d)
+abs(V - ones(100)*400).sum()  # == 0 -> our proposed sequence of cash flows exactly restores the asset value each period.
+
+Let's consider a more complex input sequence,
+
+$> tomf
+d   = ones(39)/39
+CFo = ones(80)*5
+CFx = asset_service(CFo,d,100)
+CFy = asset_service(CFo.sum(),d,100)
+Vx  = CFV(CFx,d)
+Vy  = CFV(CFy,d)
+Vz  = CFV(cat((CFo,zeros(20))),d)
+Plot().yrange(0,50).plot(CFy,'-',"$400 at begining").plot(CFx,'-',"$5/yr over 80 years").show() 
+# save("39year_Fast_Slow.png")
+Plot().yrange(0,500).plot(Vx,'-',"$400 right away w/ asset preservation").plot(Vy,'-',"$5/yr 80 years w/ asset preservation").plot(Vz,'-',"$5/yr w/o asset preservation").show() ## save("39year_Fast_Slow_Value.png")
+
+To find how much *extra* you need to contribute to the asset to restore, you simply subtract the orinal cash flow sequence. Remember to make sure it's the right length,
+
+Xtra = CFx - cat((CFo, zeros(20)))
+Plot().plot(Xtra,'-',"Extra contribution to the $5/yr x 80 effort").show()
+
+Suppose CF = (f0,f1,f2,f3,...,f{N-1})
+         d = (d0,d1,d2,d3,...,dT)
+Then
+f0d0 -f0d1 -f0d2 -f0d3 -f0d4 -f0d5
+      f1d0 -f1d1 -f1d2 -f1d3 -f1d4
+            f2d0 -f2d1 -f2d2 -f2d3
+                  f3d0 -f3d1 -f3d2
+                        f4d0 -f4d1
+                              f5d0
+SUM COLS -------------------------
+f0   f1d0-f0d1 .............  f5d0-(f4d1+f3d2+f2d3+f1d4+f0d5)
+
+The result is the change in value over time. The cumsum is the value over time. If we set d0=1 and d1,d2,...,dT to be the negative of the original depreciation values the we have a convolution.
+
+%>tomf
+D  = ones(20)/20
+CFp = asset_service(400,D,80)  # this is the asset preserving sequence
+CF = cat((400,ones(79)*20))    # this is the naive sequence
+d  = cat((1,-D))
+DV = convolve(CF,d)
+V  = DV.cumsum()
+
+This is just the differential formulation for the value calculation.
+
+CFV(CF,D) == convolve(CF, 1 - rshift(cumsum(D)))
+
+(350,20,10) - (400,) should pad out the shorter array to (400,0,0)
+(350,20,10) * (400,) should pad out the shorter array to (400,0,0), not truncate.
+
+Hmm. Not so easy. The issue is: when indexing an array past it's bounds, do we wrap or zero?
+The answer is currently: we wrap bidirectionally. This is built in pretty deeply. 
+What we can do is pad arrays so their sizes match in cases such as addition and subtraction.
+OR we can use the default value for get. Not really set up for that right now. Issue #642.
+
+
+Consider the differential formulation. We trade in asset_service for CFD. We do have to provide all CFs.
+
+D  = ones(20)/20
+CFp = asset_service(400,D,80)  # this is the asset preserving sequence
+CF = cat((400,zeros(79)))      # this is the naive sequence
+CFq = CFD(CF,D)
+Plot(CFq - CF)
+
+D  = ones(20)/20
+CF2 = cat((ones(8)*50,zeros(172)))
+CFq2 = CFD(CF2,D)
+Plot(CFq2-CF2)
+asset_service_steady_state(CF2,D)  # works, but needs another looking at to recover assumptions.
+
+### 12/13/2011 ###
+
+Upgrade NPV to cash flow basis instead of array-basis.
+From Wikipedia. $100,000 outflow, $25,000 inflow over next 6 years. Next result is over 8 thousand above zero.
+>>> NPV(0.1,(25000,25000,25000,25000,25000,25000))-100000  # 8881.517486555635
+    EXCEL: NPV(0.1,1,1,1)     = 2.486851991                # discount applied in first year
+    PHoX:  NPV(0.1,(1,1,1))   = 2.4868519909842224
+
+### 12/15/2011 ###
+
+%>tomf
+L  = LogNormal(.02,.05,1000)
+Ls = L ** (-1,0,1,2,3,4)
+
+This works. The ^0 is handled as a simple "1.0" (DOUBLE). It's something.
+
+NB: We L ** (2,)[0] is not the same as L ** 2 <<<<<<<<<<<<<<<<<<<<<<<<<< This is by design. 
+
+Here's what we have to handle to make this work (SMOKE TEST),
+%> tomf
+r      = 0.023
+X      = (10.0,20.0,30.0)
+INDEX  = (1,2,3)
+growth = LogNormal(.02,.05,1000)                # works
+G      = growth ** INDEX                        # works
+K      = X * G                                  # works
+L      = X + G                                  # works
+M      = G / X                                  # works
+N      = X - G                                  # works
+P      = div0(G, X)                             # works
+Plot().plot(G[0]).plot(G[1]).plot(G[2]).show()  # works, but not ideal
+Plot(G)                                         # works
+H      = cat(( X,G ))                           # works
+Q      = NPV(r, G)                              # SMOKE
+
+First, let's make it so we can plot multiple graphs with, Plot(ARRAY). That's all to do, but Plot(ARRAY) is expected...how do we peal off a layer? We'll need to test for shape in that case. But we supposedly do this...it's the .shape() that fails
+OK. We need to find another way. If G is (RV,RV,RV) then it's shape should be (3), but then the Plot will think it's separate values to plot. If it's not (3), but (3,2) then we trigger bad cat behaviour.
+
+NB: Resolved. The size of an RV is 1. It's supposed to behave like a value, not an array.
+
+NPV is a dot-product of an vector of cash flows and a discount vector. The problem is that we don't have a sum of independent RV's, but nested RV's. What's more, we don't currently have anyway to know this within the program. This is a serious unresolved problem. Here's the prototype,
+
+X = <(d, d*d), (L1, L1*L2)> 
+  = d*L1 + d2*L1*L2
+
+Oh, I see how to do it...we need a special NPV call that will do the regular NPV for numbers and the nested NPV for RV's
+But how do we capture the L1*L2 structure from just the (X,Y) we're handed. We privately know that X = L1 and Y = L1*L2,
+but how do we make use of this knowledge programmatically?
+
+Task: Compute L1 + L1*L2 given (X,Y) and knowledge of relational structure.
+
+We can't factor algorithmically so we'll need to process the whole thing symbolically. We must behave as-if we did the multiplications and additions we were asked to do. This is the lazy execution deal we addressed last December. Hmmm. How would it be to re-introduce this layer? Worth it for just one computation? We also need to do the graphics so there's not a lot of time for mucking about.
+
+### 12/16/2011 ###
+
+Time for symbolic factoring of RV's. We'll put in the lazy interface. This will have the possibility of symbolic computation, but only in a limited sense and not right away. So what *is* a random variable?
+
+A (Lazy) Random Variable is:
+* tree node, types: SIMPLE, DOUBLE, SUM, PRODUCT, etc.
+* container of numeric random variable as rendered/cached value, if SIMPLE
+* container of symbolic random variable as it's source, if SIMPLE and created as named RV
+* has a unique ID code used for relationship detection and reporting.
+
+When we show() a (lazy) random variable we get a rendered value. We can ask for the production tree, somehow. We're wrapped in the Variant mantle so it's not clear how this will occur. We may need to ask specifically for the underlying LRV (lazy random variable). But it will just be called an RV.
+
+We'll push the numeric random variable down into the ./random/numeric directory so it can retain it's name and internals. It will remain the source of named random variable sampling because we don't have time to alter that fact.
+
+%>tomf
+from com.tomfielden.random import RandomVariable
+X = RandomVariable.Normal(0,1,100)
+
+To satisfy Variant we need to provide the following interface,
+
+double[][]     getData()
+double         P()
+double         E()
+RandomVariable sqrt()
+String         toString()
+RandomVariable neg()
+RandomVariable reciprocal()
+RandomVariable exp()
+RandomVariable log()
+RandomVariable add(<RV>, <RV>)
+RandomVariable multiply(<RV>, <RV>)
+RandomVariable rpow(<DOUBLE>)
+RandomVariable reciprocal()
+RandomVariable pow(<RV>, <RV>)
+double         GT(<DOUBLE>), GT(<RV>), ..., LT(<RV>)
+
+Many of these questions can be answered symbolically if we knew the formal type.
+The question is this: do we build ./util/RandomVariable that accesses ./random for it's support code? Let's do it.
+First the shell.
+
+Now we need to supe-up the symbolic random variables so they can create samplings on demand. That's aready done.
+How do we go from SRV inputed to NRV shown? We must do something that requires output such as graphing. 
+Calling getData() will do it, but not toString(). I think it's time to try a compile. It's compiled.
+
+%> tomf
+L = LogNormal(0,1,25)  --- but this should have not compiled. We need a new name. No more collisions! Fixed.
+
+%> tomf
+L = LogNormal(0,1)
+L**2
+(LogN[0,1] * LogN[0,1])   -- expected, but didn't get! BUG
+L = LogNormal(0,1)
+L ** (1,2,3)              -- a horrible HACK. Needs work!
+                          -- NB: We do not have all the id codes showing so the cascade is
+                             ({1}, ({1}*{2}), (({1}*{2})*{4}))
+			     missing {3}?, not it's the RV containing ({1}*{2}), but not displayed.
+### 12/17/2011 ###
+
+Move SymbolicRandomVariable to ParametricRandomVariable and encode all the fiddlies into it. 
+This new base class will carry a unique id code.
+NUMERIC and SYMPOLIC become LEAF? RV? SIMPLE? FUNDAMENTAL? PARAMETRIC
+Suppose we ask a LazyRandomVariable for E()? It will have to render itself. No caching (at this time). But what is rendered? A ParametricRandomVariable since it's possible the results are symbolic. Same goes for LT, LTE, ...
+Thus rendering does not change the type!
+The question remains: do we represent DOUBLE in LazyRandomVariable or ParametricRandomVariable and the answer is now clear: in the former since ParametricRandomVariable's have unique ID code and DOUBLE's and Lazy do not.
+
+NUMERIC, SYMBOLIC => PARAMETRIC
+m_nrv = null;    => m_prv
+
+NB: must restart each time to see the following exact sequence of ID's since global.
+NB: "new LazyRandomVariable(<LRV>)" does a deep copy. All new ID's
+
+%>tomf
+L = LogNormal(0,1)
+L**2                 ## (LogN[0,1]_1 * LogN[0,1]_2)
+
+%>tomf
+L = LogNormal(0,1)
+L**3                 ## ((LogN[0,1]_1 * LogN[0,1]_2)*LogN[0,1]_3)
+
+%>tomf
+L = LogNormal(0,1)
+L ** (1,2,3)         ## (LogN[0,1]_1, (LogN[0,1]_1 * LogN[0,1]_2), ((LogN[0,1]_1 * LogN[0,1]_2) * LogN[0,1]_3))
+
+%>tomf
+L = LogNormal(0,1)
+L ** (2,4)           ## ((LogN[0,1]_1 * LogN[0,1]_2), (((LogN[0,1]_1 * LogN[0,1]_2) * LogN[0,1]_3) * LogN[0,1]_4))
+
+%>tomf
+L = LogNormal(0,1)
+L ** (-1,0,1,2)      ## (1/LogN[0,1]_1, 1.0, LogN[0,1]_1, (LogN[0,1]_1 * LogN[0,1]_2))
+
+Now we try to applie immediate transformations especially for symbolic processing. This engine must be switchable.
+First we find the ones we need for our current project (EPA model).
+
+>>> Price * Market_Growth ** Index
+%>tomf
+P = 7
+M = LogNormal(2,5)
+I = (1,2,3)
+X = P*M**I   ## ((LogN[2,5]_1 * 7), ((LogN[2,5]_1 * LogN[2,5]_2) * 7), (((LogN[2,5]_1 * LogN[2,5]_2) * LogN[2,5]_3) * 7))
+
+We have some rules to check.
+%>tomf
+from com.tomfielden.random import RandomVariable
+m1 = .02
+s1 = .05
+m2 = .03
+s2 = .06
+X = RandomVariable.LogNormal(m1,s1,1000)
+Y = RandomVariable.LogNormal(m2,s2,1000)
+Z = X*Y
+Z.plot("Z")
+m3 = m1+m2                   ## sum of means
+s3 = (s1**2 + s2**2)**0.5    ## sum of variances
+K = RandomVariable.LogNormal(m3,s3,1000)
+K.plot("K")
+# plot "Z" with lines, "K" with lines
+a = 5
+Q = a * X
+m4 = (m1 + log(a)).toDouble()
+s4 = s1
+R = RandomVariable.LogNormal(m4,s4,1000)
+Q.plot("Q")
+R.plot("R")
+# plot "Q" with lines, "R" with lines
+
+Before we get too far, let's convert the static ops to members...Now we're ready.
+First we need to detect the case. The two LRV's need to be PARAMETRIC and specific pairs of RV types and independent.
+But wait, we can't because we'd lose the geneology! We'll just have to wait until the end...
+How do we do this? We'll just have to build the right constructs.
+What is the DOUBLE * LogN ?
+
+RULES for LogNormal (independent pairs) -- See: Wikipedia.org
+  X     ~ LogN(u1, s1)
+  Y     ~ LogN(u2, s2)
+  a * X ~ LogN(u1 + log(a), s1)
+  X * Y ~ LogN(u1 + u2, sqrt(s1**2 + s2**2))
+  1/X   ~ LogN(-u1, s1)
+  X^a   ~ LogN(a*u1, sqrt(a)*s1), a != 0  <<< Not the same as X*X*..*X a-times.
+  E[X]  = exp(u1 + s1^2 / 2)
+  M[X]  = exp(u1)
+  V[X]  = (exp(s1^2) - 1) * exp(2*u1 + s1^2)
+
+IDEA: move LazyRandomVariable from ./util to ./random                         DONE
+      rename RandomVariable to NumericRandomVariable                          DONE
+      encode NumericRandomVariable into Variant alongside LazyRandomVariable. DONE
+
+OK. Test.
+%>tomf
+X = LogNormal(0,1)
+Y = LogNormalNumeric(0,1,500)
+Plot().plot(X).plot(Y).show()
+
+Had an issue. Here's some debugging tests that helped. Can access deeply into system.
+%>tomf
+from com.tomfielden.random import *
+X = Normal(0,1).getLazyRandomVariable().get().sample(10)
+X = ParametricRandomVariable.Normal(0,1).sample(10)
+Y =    NumericRandomVariable.Normal(0,1,10)
+Z = ParametricRandomVariable.test(0,1,10)
+
+### 12/18/2011 ###
+
+Build: NVR ** INDEX
+
+Here's what we have to handle to make this work (SMOKE TEST),
+%> tomf
+r      = 0.023
+X      = (10.0,20.0,30.0)
+INDEX  = (1,2,3)
+L      = LogNormalNumeric(.02,.05,1000)         # OK
+G      = L ** INDEX                             # OK
+K      = X * G                                  # OK
+L      = X + G                                  # OK
+M      = G / X                                  # OK
+N      = X - G                                  # OK
+P      = div0(G, X)                             # OK
+Plot().plot(G[0]).plot(G[1]).plot(G[2]).show()  # OK
+Plot(G)                                         # OK
+H      = cat(( X,G ))                           # OK
+Q      = NPV(r, G)                              # OK, but totally different from LazyRandomVariable case.
+d      = 1/(1+r)
+P      = L*d*(1 + L*d*(1+L*d))                  # OK, fatter than Q
+Plot().plot(P).plot(Q).show()
+
+Now for the Lazy version,
+
+%> tomf
+r      = 0.023
+X      = (10.0,20.0,30.0)
+INDEX  = (1,2,3)
+L      = LogNormal(.02,.05)                     # OK
+G      = L ** INDEX                             # OK
+K      = X * G                                  # OK
+P      = div0(G, X)                             # OK
+Plot(G)                                         # NOT YET AVAILABLE
+H      = cat(( X,G ))                           # OK
+Q      = NPV(r, G)                              # OK, formally
+
+Let's get the LazyRandomVariable.eval() running. Here's the first case to address,
+
+%> tomf
+L = LogNormal(.02,.05) 
+G = L ** (1,2,3)
+Q = NPV(.023, G)
+Q.printTree()
+
+ADD
+  ADD
+    MUL
+      LogN[0.02,0.05]_1
+      0.977517
+    MUL
+      MUL
+        LogN[0.02,0.05]_1
+        LogN[0.02,0.05]_2
+      0.955540
+  MUL
+    MUL
+      MUL
+        LogN[0.02,0.05]_1
+        LogN[0.02,0.05]_2
+      LogN[0.02,0.05]_3
+    0.934056
+
+We should recognize the rule DOUBLE*LOGNORMAL, but the deal is that would change the specific ID code.
+WANT: If we factor, then we respect ID code. It should look something like this,
+
+(L_1 * (0.977517 + L_2 * (0.955540 + (L_3 * 0.934056))))
+
+WANT: and in Tree form,
+
+MUL
+  LogN[0.02,0.05]_1
+  ADD
+    0.977517
+    MUL
+      LogN[0.02,0.05]_2
+      ADD
+        0.955540
+	MUL
+	  LogN[0.02,0.05]_3
+	  0.934056
+
+TODO: Make DOUBLE a ParametricRandomVariable, not a LazyRandomVariable. Always ID = 0.
+Note: Changed the depth of LazyRandomVariable copy constructor. Creates new parents.
+
+collect(ADD) test case
+
+%>tomf
+L1 = LogNormal(1,2) 
+L2 = LogNormal(1,2) 
+L3 = LogNormal(1,2) 
+L4 = LogNormal(1,2) 
+L5 = LogNormal(1,2) 
+L6 = LogNormal(1,2) 
+L7 = LogNormal(1,2) 
+S  = (((5*L1)+L2)+(L3+L4)+((L5+(L6*7))+12))
+SL = S.getLazyRandomVariable()
+SL.printTree()
+SL.collect()
+SL.printTree()
+
+%> tomf
+L = LogNormal(.02,.05) 
+G = L ** (1,2,3)
+Q = NPV(.023, G)
+Q.getLazyRandomVariable().collect()  # force
+Q.getLazyRandomVariable().factor()  # force
+Q.printTree()
+
+LazyRandomVariable.collect() WORKS. Now what? More transforms?
+
+### 12/19/2011 ###
+
+Factoring:
+1) detect the pattern: S=>P.
+2) Form Map<String,Integer> for each P. 
+   Intersect Set<String> for each.
+   Either find singleton s or none. Do not handle multiple intersection elements at this time, flag as error
+   Use s to build ArrayList<Integer> representing the index into each P that is the common element.
+3) Arbitrarily select one version of the common element L1 and set it aside.
+4) Use the s:ArrayList<Integer> to remove elements from the parallel list of P (parents)
+5) Create a new-S with current (expurgated parents)
+6) Replace current S with new P and attach two parents: L1 and new-S
+7) Apply factor to new-S.
+
+8) We know all the parents of new-S are MUL's. We want to detect the two trivial cases of P.size() == 0 or 1
+   NB: This is an extra step that might prevent further factoring in the P.size() == 1 case.
+       Since the P.size() == 0 doesn't happen for us we can't spare the time to test it. 
+       Invoke The leave-it-until-need-it principle.
+
+%> tomf
+L = LogNormal(.02,.05) 
+G = L ** (1,2,3)
+Q = NPV(.023, G)
+Q.printTree()
+Q.getLazyRandomVariable().collect()  # force
+Q.printTree()
+Q.getLazyRandomVariable().factor()   # force
+Q.printTree()
+Plot(Q)                              # finally!
+
+How do we ensure the original form is available? We don't need to this time so we don't care.
+However, when we do the next phase for burning the tree we we do need to ensure we keep the structure.
+Withing the ParametricRandomVariable we need to perform the unary and binary operations.
+
+These graphs play with mixed symbolic/numeric calculation...
+
+%>tomf
+L1 = LogNormal(.02,.05) 
+L2 = LogNormal(.02,.05) 
+Plot().plot(L1*L1).plot(L1*L2).show()  # the same according to theory
+
+L1 = LogNormal(.02,.05) 
+L2 = LogNormal(.02,.05) 
+Plot().plot(L1+L1).plot(L1+L2).show()      # first symbolic, second numeric. Different!
+(L1 + L1).getLazyRandomVariable().eval()   # see!
+
+N1 = Normal(2,1)
+N2 = Normal(2,1)
+Plot().xrange(-3,15).yrange(0,1).plot(N1*N1).plot(N1*N2).show()   # cool plot!
+
+%>tomf
+L  = LogNormal(.02,.05)
+G  = L ** (1,2,3)
+Q  = NPV(0.023, G)                          # OK, formally
+QL = Q.getLazyRandomVariable()
+QL.printTree()
+QL.collect()
+QL.printTree()
+QL.factor()
+QL.printTree()                              # OK
+Plot(Q)
+
+%>tomf
+L  = LogNormal(.02,.05)
+G = L ** arange2(1,30)
+Q = NPV(.023,G)
+Plot().xrange(15,50).plot(Q).show()
+
+Next problem. How to do average of mixed array
+%>tomf
+L = LogNormal(.02,.05)
+X = Variant((1,2,3,4,5))
+X.ave()
+Y = Variant((1,2,3,L,L))
+Y.ave()
+A = Variant((X,Y))
+A.ave()
+
+### 12/20/11 ###
+
+We need to enhance eval() to handle cases we see in the EPA model.
+TODO: collect() must collect multiple DOUBLES for MUL and ADD  ---- DONE
+
+%>tomf
+L = LogNormal(.02,.05)
+X = (L*2*3).getLazyRandomVariable()
+X.collect_binary_ops()
+X.printTree()
+MUL
+  LogN[0.02,0.05]_2
+  2
+  3
+X.collect_doubles()
+X.printTree()
+MUL
+  6
+  LogN[0.02,0.05]_2
+
+TODO: factor() must handle multiple common elements.
+
+%>tomf
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = ((L1*L2*2*3)+(L1*L2*5)).getLazyRandomVariable()
+X.collect()
+X.printTree()
+X.factor_pure()
+X.printTree()
+X.anneal()
+X.printTree()
+X.collect()
+X.printTree()
+
+%>tomf
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = ((L1*2*3)+(L1*L2*5)).getLazyRandomVariable()
+X.collect()
+X.printTree()
+X.factor_pure()
+X.printTree()
+X.anneal()
+X.printTree()
+X.collect()
+X.printTree()
+
+%>tomf
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = ((L1*2*3)+(L1*L2*5)).getLazyRandomVariable()
+X.collect()
+X.factor()
+X.printTree()
+
+%>tomf
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = (-(L1*L2*(6+1))+5).getLazyRandomVariable()
+X.printTree()
+X.collect()
+X.factor()
+X.printTree()
+
+###################
+
+%>tomf TEST CASE 1                OK
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = ((L1*L2*2*3)+(L1*L2*5)).getLazyRandomVariable()
+X.simplify()
+X.printTree()
+
+%>tomf TEST CASE 2                OK
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = ((L1*2*3)+(L1*L2*5)).getLazyRandomVariable()
+X.simplify()
+# X.factor_pure()
+# X.anneal()
+X.printTree()
+
+%>tomf                            OK
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X = (-(L1*L2*(6+1))+5).getLazyRandomVariable()
+X.simplify()
+X.printTree()
+
+%>tomf                            OK
+L1 = LogNormal(.02,.05)
+X = (((L1+1)+2)+3)+4
+X = X.getLazyRandomVariable()
+X.printTree()
+
+TODO: replace toString() with printTree() in LazyRandomVariable -- not so easy. printTree prints, not strings.
+NB: can't do newlines within a string and have shell print them. So we change printTree() to just print().
+
+%>tomf                            OK
+L1 = LogNormal(.02,.05)
+L1.print()
+
+TODO: Build distribute() for pushing DOUBLE across MUL. Intended to be done first!
+      NOTE: we first replace NEG(X) with MUL(X,-1)
+
+%>tomf TEST CASE 4
+L = LogNormal(.02,.05)
+X = 5 - L
+Y = X.getLazyRandomVariable()
+Y.print()
+
+%>tomf TEST CASE 5
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+X  = 5*(L1 + L2)
+Y = X.getLazyRandomVariable()
+Y.print()
+
+TODO: Transform 5 + L1 + L1*L2 + L1*L2*L3 => (5 + L1) + (L1*L2 + L1*L2*L3)
+      group_sum_products()
+
+%>tomf TEST CASE 6
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+X  = 5 + L1 + L1*L2 + L1*L2*L3
+Y = X.getLazyRandomVariable()
+Y.print()
+Y.simplify()
+Y.print()
+### or ###
+Y.replace_negs();
+Y.collect_anneal();
+Y.distribute();
+Y.collect_anneal();
+Y.group_sum_products()   ## insert here
+Y.print()
+Y.factor();   
+Y.collect_anneal();
+
+MESSED UP. NEED TO START FRESH TOMORROW.
+
+%>tomf TEST CASE 7
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+X  = 5 + L1*2 + L1*L2*3 + L1*L2*L3*4
+Y = X.getLazyRandomVariable()
+Y.print()
+Y.simplify()
+Y.print()
+
+MESSED UP. NEED TO START FRESH TOMORROW, I SAID!
+
+### 12/21/2011 ### 12/22/2011 ###
+
+replace_negs() is simple and we'll test it later.
+collect()  rebuilt. test,
+
+%>tomf  TEST CASE 1 & 2
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+X = (L1 + (L2 + 5)).getLazyRandomVariable()
+X.print()
+X.collect()
+X.print()
+Y = (L1 * ((L2*4) * (L3*5))).getLazyRandomVariable()
+Y.print()
+Y.collect()
+Y.print()
+
+%>tomf TEST CASE 3 & 4
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+X = (L1 + 4 +L2 + 5).getLazyRandomVariable()
+X.print()
+X.collect()
+X.print()
+Y = (L1 + ((L2*4) * (L3*5)) * 6).getLazyRandomVariable()
+Y.print()
+Y.collect()
+Y.print()
+
+%>tomf TEST CASE pre-6 & 5 & 6 & 7
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+K = (3*(L1+2)).getLazyRandomVariable()
+K.collect()
+K.distribute()
+K.print()
+X = (5*(L1+(4+L2))).getLazyRandomVariable()
+X.collect()
+X.print()
+X.distribute()
+X.print()
+Y = (3*(L1+2)+4+L2).getLazyRandomVariable()
+Y.collect()
+Y.print()
+Y.distribute()
+Y.print()
+Y.collect()
+Y.print()
+Y.distribute()
+Y.print()
+Z = (7*L3*5*(3*(L1+2)+4+L2)).getLazyRandomVariable()
+Z.collect()
+Z.pummel()
+Z.print()
+
+%>tomf TEST CASE 12
+L1 = LogNormal(.02,.05)
+X = (5*(L1+0.)).getLazyRandomVariable()
+X.distribute()
+X.collect()
+Y = (5 + (L1*1.)).getLazyRandomVariable()
+Y.distribute()
+Y.collect()
+
+%>tomf TEST CASE 8,9,10,11
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+W = (L1*(L2+2)).getLazyRandomVariable()
+X = (L1 + L1*L2).getLazyRandomVariable()
+Y = (2 + L1 + L1*L2).getLazyRandomVariable()
+Z = (2 + 3*L1 + 7*L1*L2).getLazyRandomVariable()
+K = (2 + 3*L1 + 7*L1*L2 + 5*L1*L2*L3).getLazyRandomVariable()
+W.simplify()
+X.simplify()
+Y.simplify()
+K.simplify()
+W.factor()
+X.factor()
+Y.factor()
+K.factor()
+
+Here are the TEST CASE's combined. These are from 12/21/11 in the "Composition Notebook".
+
+%>tomf
+L1 = LogNormal(.02,.05)
+L2 = LogNormal(.02,.05)
+L3 = LogNormal(.02,.05)
+X01 = (L1 + (L2 + 5))                   .getLazyRandomVariable()
+X02 = (L1 * ((L2*4) * (L3*5)))          .getLazyRandomVariable()
+X03 = (L1 + 4 + L2 + 5)                 .getLazyRandomVariable()
+X04 = (L1 + ((L2*4) * (L3*5)) * 6)      .getLazyRandomVariable()
+X05 = (5*(L1+(4+L2)))                   .getLazyRandomVariable()
+Xp6 = (3*(L1+2))                        .getLazyRandomVariable()
+X06 = (3*(L1+2)+4+L2)                   .getLazyRandomVariable()
+X07 = (7*L3*5*(3*(L1+2)+4+L2))          .getLazyRandomVariable()
+X0x = (L1*(L2+2))                       .getLazyRandomVariable()
+X08 = (L1 + L1*L2)                      .getLazyRandomVariable()
+X09 = (2 + L1 + L1*L2)                  .getLazyRandomVariable()
+X10 = (2 + 3*L1 + 7*L1*L2)              .getLazyRandomVariable()
+X11 = (2 + 3*L1 + 7*L1*L2 + 5*L1*L2*L3) .getLazyRandomVariable()
+X12 = (L1*3 + L1*5)                     .getLazyRandomVariable()
+X13 = (L1 + L2 + L1)                    .getLazyRandomVariable()   # known to fail.
+X14 = (L1 * L1)                         .getLazyRandomVariable()   # known to fail.
+X01.simplify().print()
+#ADD
+#  LogN[0.02,0.05]_1
+#  LogN[0.02,0.05]_2
+#  5
+X02.simplify().print()
+#MUL
+#  LogN[0.02,0.05]_1
+#  20
+#  LogN[0.02,0.05]_2
+#  LogN[0.02,0.05]_3
+X03.simplify().print()
+#ADD
+#  9
+#  LogN[0.02,0.05]_1
+#  LogN[0.02,0.05]_2
+X04.simplify().print()
+#ADD
+#  LogN[0.02,0.05]_1
+#  MUL
+#    120
+#    LogN[0.02,0.05]_2
+#    LogN[0.02,0.05]_3
+X05.simplify().print()
+#ADD
+#  MUL
+#    5
+#    LogN[0.02,0.05]_1
+#  MUL
+#    5
+#    LogN[0.02,0.05]_2
+#  20
+X06.simplify().print()
+#ADD
+#  10
+#  MUL
+#    3
+#    LogN[0.02,0.05]_1
+#  LogN[0.02,0.05]_2
+X07.simplify().print()
+#MUL
+#  LogN[0.02,0.05]_3
+#  ADD
+#    350
+#    MUL
+#      105
+#      LogN[0.02,0.05]_1
+#    MUL
+#      35
+#      LogN[0.02,0.05]_2
+X08.simplify().print()
+#MUL
+#  LogN[0.02,0.05]_1
+#  ADD
+#    1
+#    LogN[0.02,0.05]_2
+X09.simplify().print()
+#ADD
+#  2
+#  MUL
+#    LogN[0.02,0.05]_1
+#    ADD
+#      1
+#      LogN[0.02,0.05]_2
+X10.simplify().print()
+#ADD
+#  2
+#  MUL
+#    LogN[0.02,0.05]_1
+#    ADD
+#      3
+#      MUL
+#        7
+#        LogN[0.02,0.05]_2
+X11.simplify().print()
+#ADD
+#  2
+#  MUL
+#    LogN[0.02,0.05]_1
+#    ADD
+#      3
+#      MUL
+#        LogN[0.02,0.05]_2
+#        ADD
+#          7
+#          MUL
+#            5
+#            LogN[0.02,0.05]_3
+X12.simplify().print()
+#MUL
+#  LogN[0.02,0.05]_1
+#  8
+X01.isIndependent()
+#True
+X13.isIndependent()
+#WARNING: PID {1} appears 2 times.
+#False
+Works!
+
+TODO: Make a deep-copy (w/o altering PID's) of LazyRandomVariable DONE
+TODO: Cache results of eval. DONE
+TODO: Build warning system to detect multiple instances of proper LEAF's: HashMap(<PID>,<COUNT>) DONE
+
+Caching: what if we don't eval(), but just get()? If not a LEAF, will trigger eval() else return cache.
+Do we really need "depth-first" anymore for eval_simple? No. Upgraded into get() anyway.
+
+For another day....
+TODO: Define NEG->LEAF as LEAF w/ negative PID. Define DOUBLE as 0 PID.
+TODO: At start of simplify, convert all integer powers of LEAFs to multiple LEAF's
+      After factor(), collect_powers(). Issue: subset generation.
+TODO: Upgrade factor() to try subsets if intersect all products fails. Again, subset generation.
+
+New features:
+
+%>tomf
+L = LogNormal(0.02,0.05)
+N = NormalEquivalent(L-1)
+Plot((L,N))
+
+%>tomf
+U1 = Uniform(1,2)
+U2 = Uniform(3,4)
+Plot(U1+U2)
+
+### 12/27/2011 ###
+
+Want to plot with different style. Not working right.
+
+### 1/23/2012 ###
+
+CHANGE: tomf -> phox
+#!/usr/bin/env sh
+jython -i -c "from com.tomfielden.util import *; from com.tomfielden.util.Functions import *"
+
+Update Functions to include Students-t. The sampling function is more sophisticated than simple linear.
+There are some artifacts that need to be addressed. A "flat top" and "negative kink".
+
+>>> Plot().xrange(-10,10).plot(StudentNumeric(1,50)).plot(CauchNumeric(0,1,50)).show()
+
+With the even newer sampling scheme (quadratic/superquadratic), and using the original Numeric.Plot routine the
+plots come out beautifully. Need to update the getData routine to allow reflect the original plotting routine.
+We'll do mid-interval probability density heights. 
+
+NOTE: Cauchy is Student(nu = 1). Student now accepts median and scale just like Cauchy:
+
+>>> Plot().xrange(-10,10).plot(StudentNumeric(0,1,1,50)).plot(CauchyNumeric(0,1,50)).show()
+
+Lazified:
+
+>>> Plot().xrange(-10,10).plot(Student(0,1,1)).plot(Cauchy(0,1)).show()
+
+Let's check NumericRandomVariable.split() this is the key truncation operation.
+
+<phox>
+X = Uniform(0,1).getNumericRandomVariable()
+(L,R) = X.truncate(.2)
+
+Try Black-Scholes with LogNormal
+Let So = 20, sigma = 1, 
+then mu = log(So) - sigma^2 / 2
+
+<phox>
+K = 15
+So = 20
+sigma = .1
+mu = log(So) - sigma**2 / 2.
+R = Normal(mu, sigma)
+S = exp(R)
+S = S.getNumericRandomVariable()
+(L, R) = S.split(K)
+q = L.P()
+muR = R.scale(1/(1-q)).E()    #### NB: The mean is really sensitive to num points.
+Co = (muR - K)*(1-q)
+
+## Compare to BlackScholes(So,K,sigma)
+CoBS = BlackScholes(So,K,sigma)
+
+Now we try it with Student,
+<phox>
+K        = 15                               ## meaningless. Has no effect
+So       = 20                               ## meaningless. Can't achieve this
+sigma    = .1
+nu       = 3.64                             ## Platen-Heath: 3.64
+mu       = 0
+R        = Student(mu, sigma, nu)
+S        = exp(R)
+(SL, SR) = S.getNumericRandomVariable().split(K)
+q        = SL.P()
+muR      = SR.scale(1/(1-q)).E()
+Co       = (muR - K)*(1-q)                  ## 19.568 if Student-t mean = -0.894
+Plot().xrange(-2,2).plot(R).show()
+Plot().xrange(0.5,1.5).plot(S).show()
+
+Note: There is a significant amount of probability piled up at zero for S, 
+but not marked as discrete. Why?
+The exponential of -25 is really close to zero and things just pile up there.
+ERROR: S < .02 returned -Infinity FIXED.
+
+### 2/24/12 ###
+See: ./develop/notes/random_variables/Levy-Stable/
+
+Introduce Levy-Stable distributions. The challenge is to do the Tanh-Sinh 
+Integration fast since its not adaptive quadrature. The idea is that we do 
+levels with EoooE followed by E|o|o|oE. The lowest level contains the endpoints
+and some internal points (equally spaces). All other levels intersperse points.
+
+### 2/25/12 ###
+LevyStable requires sampling levels. A Level has 2(2^n)+1 points and each level
+introduces twice as many points as the last. Zeroth level has E0E, first level
+has E*0*E, etc. Since we don't know how many levels we will need we can't 
+pre-allocate, but we can cache because we repeat for many values of x, but 
+only one pair, (alpha, beta). We need to create a list of theta sample values 
+and derivative of tanh-sinh scaling factor for the change-of-variables.
+
+phox>>>
+from com.tomfielden.random import *
+L = LevyStableDistribution(1.5, 0.5, 0, 0, 100)
+L.cdf(1)
+
+### 2/27/12 ###
+
+from com.tomfielden.random import *
+alpha = 1.5
+beta  = 0.51
+L = LevyStableDistribution(alpha, beta)
+L.cdf(1)
+
+Finally working. Haven't stress-tested, but want to get the PL-density working. Let's resurrect
+the exponential-knee sampling scheme used for Students-t. The params will depend on alpha.
+
+phox>>
+LS = LevyStableNumeric(1.5, 0.51, 0, 1, 100)
+Plot(LS)
+
+### 2/28/12 ###
+
+phox>>
+LS = LevyStableNumeric(1.5, 0.51, 0, 1, 100)
+from com.tomfielden.random import *
+P = LevyStableDistribution.partition(1.5, 0.51, 100)  ## for refence only
+XP = LevyStableDistribution.pdf(1.5, 0.51, 0, 1, 100)
+Plot().xrange(-5,5).plot(LS).plot(Variant(XP[0]),Variant(XP[1])).show()
+
+TODO: Update Plot to accept double[][] (or the Variant equivalent)
+
+phox>>
+LS = LevyStableNumeric(.5, 0.51, 0, 1, 100)
+Plot().xrange(-5,5).plot(LS).show()
+
+from com.tomfielden.random import *
+LevyStableDistribution.sample_value(1, .8, 12, 1E12)
+
+from com.tomfielden.random import *
+Plot().plot(Variant(LevyStableDistribution.partition(1.5, 0, 100))).show()
+Plot().xrange(-5,5).plot(LevyStableNumeric(1.5, 0, 0, 1, 100),'*').show()
+
+Let's try modeling the exponent of L as in 1E+{y(alpha)}
+Emipirically we have,
+  y(.25) = 50
+  y(.5)  = 28
+  y(1)   = 18
+  y(1.5) = 8
+  y(2)   = 5
+Let's try the following model,
+  y(x) = (ax+b)/(x+c)  given yi = y(xi) for i = 1,2,3
+
+>>>
+def y(x, x1, y1, x2, y2, x3, y3):
+    D = x1*y2 - x1*y3 - x2*y1 + x2*y3 + x3*y1 - x3*y2
+    a = ((y2-y3)*x1*y1 + (y3-y1)*x2*y2 + (y1-y2)*x3*y3) / D
+    b = ((x2*y3-x3*y2)*x1*y1 + (x3*y1-x1*y3)*x2*y2 + (x1*y2-x2*y1)*x3*y3) / D
+    c = ((x2-x3)*x1*y1 + (x3-x1)*x2*y2 + (x1-x2)*x3*y3) / D
+    print a,b,c
+    return (a*x + b)/(x + c)
+
+def yp(x):
+    return y(x, .25,50., 1,18.,  2.,5)
+
+(a,b,c) = -14.7191011236 42.0224719101 0.516853932584
+
+seems to work well. Let's use that!
+
+### 2/29/12 ###
+
+Let's find the mode of the Levy-Stable density function. Will try a quadratic optimization with
+a bisection fail-over just like Dekker for fixed-point.
+
+from com.tomfielden.random import *
+LevyStableDistribution(.6, 1).mode()
+
+LS = LevyStableNumeric(0.5, 0.51, 0, 1, 100)
+from com.tomfielden.random import *
+XP = LevyStableDistribution.pdf(0.5, 0.51, 0, 1, 100)
+Plot().xrange(-5,5).plot(LS).plot(Variant(XP[0]),Variant(XP[1])).show()
+
+from com.tomfielden.random import *
+XP = LevyStableDistribution.pdf(0.5, 1, 0, 1, 100)
+Plot().xrange(-5,5).plot(LevyStableNumeric(0.5, 1, 0, 1, 100)).show()
+
+L = LevyStableNumeric(2, 1, 0, 1, 100)
+
+ERROR: 1 <= alpha < 1.7, beta = 1 failing.
+
+from com.tomfielden.random import *
+z = LevyStableDistribution.partition(1.6,1,100)
+L = LevyStableDistribution(1.6,1)
+L.pdf(z[0])
+XP = LevyStableDistribution.pdf(1.6, 1, 0, 1, 100)
+Plot().xrange(-5,5).plot(Variant(XP[0]),Variant(XP[1])).show()
+
+Really wonks out for i = 14
+L.pdf(z[14])                  # z = -6.211970376126931, pdf = -6.001538516688133e+269
+-5.8669293142885275, -5.531746624700855
+L.cdf(-5.6)                   # 2.695520986510069e+205
+L.cdf(-5)                     # 4.522546844261331e+153
+
+from com.tomfielden.random import *
+L = LevyStableDistribution(1.6,1)
+L.cdf(-5)
+theta = 1.5707963267948963
+L.m_params_neg.g(1.5707963267948948,5)  #  12.545241171765692  FINE
+L.m_params_neg.g(1.5707963267948963,5)  # -391.6982783673133   BAD!
+#                1.5707963267948966     # Math.PI / 2
+So, really close to pi/2 is very bad...how come? V(theta) freaks out...
+L.m_params_neg.V(1.5707963267948963)    # -3.731685386182384           (BAD)
+L.m_params_neg.V(1.5707963267578702)    # 1.0*0.25*0.9999940030803454  (GOOD)
+
+L.m_params_neg.V(1.5707963267948963)    # 8.582519342802016E-27*-1.6081226496766366E-16/3.698528230046565E-43
+
+alpha*(theta0+theta)-theta= 1.5707963267948968
+                            1.5707963267948961
+
+Notice the sign flip of the middle term. Should be positive.
+
+How about we force the middle term to be positive when it's close?
+
+from com.tomfielden.random import *
+L = LevyStableDistribution(1.1,1)
+L.cdf(-5)
+L.m_params_neg.g(1.5707963267948948,5)  #  9287.61432216977  FINE-ish
+L.m_params_neg.g(1.5707963267948966,5)  # nan                BAD!
+
+NB: FIX: Don't integrate all the way to pi/2, just a hair shy of it.
+
+from com.tomfielden.random import *
+L = LevyStableDistribution(1,0.1)
+L.cdf(-100)
+
+theta = 1.5707963267938965
+L.m_params_neg.V(theta)
+
+ERROR: We don't have alpha = 1, beta != 0 working.
+
+### 3/1/12 ###
+
+Want to introduce "blunt(x) = blunt_left(x)" and "blunt_right(x)" as a form of truncation.
+See (2/23/12)
+
+X = Uniform(0,1).getNumericRandomVariable()
+(L,R) = X.split(.2)
+
+The challenge is to set a discrete probability value into an exiting discrete distribution.
+
+X = Uniform(0,1).getNumericRandomVariable()
+Y = X.blunt(.2)
+
+X = NormalNumeric(0,1,100).blunt(-.2)
+Plot(X)
+X.mean()   ### ERROR: Needs to account for discrete! FIXED.
+
+X = PoissonNumeric(5)
+X.mean()
+
+X = NormalNumeric(5,2,100).blunt(10)
+Plot(X)
+X.mean()
+
+X = LevyStableNumeric(2,0,0,1,100)
+X.mean()
+
+X = Uniform(2,5).getNumericRandomVariable()
+X.variance()    # 0.75
+
+X = NormalNumeric(5,2,1000)
+X.variance()   # 4.000171008512357
+
+### 3/2/12 ###
+
+Want to approximate a gaussian to a pair of adjacent partitions: a(p)b(q)c
+with function f(x) = 1/sqrt(2pi)*exp(-((x-u)/s)^2)
+so that I_a^b f(x) dx = p
+and     I_b^c f(x) dx = q
+
+X = NormalNumeric(5,2,10)
+#... 11.666666666666668(4.2752970730401885E-4)14.333333333333332(1.52964015178569E-6)17.0
+
+from com.tomfielden.random import *
+NumericRandomVariable.ContinuousRandomVariable.newton_gaussian_step((5.,2.),11.666666666666668,14.333333333333332,17.0,4.2752970646030641651E-4,1.529640148886028855898E-6)
+
+but...(according to Wolfram|alpha) p = 4.2752970646030641651E-4
+                                       4.2752970730401885E-4  // PHoX (fudged)
+                                   q = 1.529640148886028855898E-6
+                                       1.52964015178569E-6    // PHoX (fudged)
+
+from com.tomfielden.random import *
+x = (7,3)
+x = NumericRandomVariable.ContinuousRandomVariable.newton_gaussian_step(x,11.666666666666668,14.333333333333332,17.0,4.2752970646030641651E-4,1.529640148886028855898E-6)
+NB: Don't start too low and be sure to wrap in Dekker. How?
+
+from com.tomfielden.random import *
+x = (1,-1)
+x = NumericRandomVariable.ContinuousRandomVariable.newton_exp_step(x,11.666666666666668,14.333333333333332,17.0,4.2752970646030641651E-4,1.529640148886028855898E-6)
+
+from com.tomfielden.random import *
+NumericRandomVariable.ContinuousRandomVariable.newton_exp(0,1,2,100,1)
+## A = 465.16870565536277, B = -4.605170185988092
+NumericRandomVariable.ContinuousRandomVariable.newton_exp(11.666666666666668,14.333333333333332,17.0,4.2752970646030641651E-4,1.529640148886028855898E-6)
+## A = 45729109.6101612, B = -2.1123717239339648
+W|alpha: integrate(45729109.6101612 * exp(-2.1123717239339648 * x), x=14+1/3..17)
+
+WORKS!
+
+### 3/3/12 ###
+
+from com.tomfielden.random import *
+N = NumericRandomVariable.Normal(0,1,10).Continuous()
+N.variance2(0)
+NumericRandomVariable.ContinuousRandomVariable.newton_exp(-2,-0.666666666666667,0.666666666666667,0.22974240605206556,0.4950149258829059)
+NumericRandomVariable.ContinuousRandomVariable.newton_exp(-0.666666666666667,0.666666666666667,2,0.4950149258829059,0.22974240605206556)
+
+### 3/4/12 ###
+
+How about we provide piecewise fragments that interplay instead of piecewise uniform?
+
+Let's try a gaussian fit near x=0,
+%> python
+from pylab import *
+x = linspace(-.62,.62,500)
+N = exp(-x**2/2)
+f = 1-x**2/2+x**4/8 #-x**6/48
+gx = (-.24,-.12,0,.12,.24)
+gy = array((0.387, .396,.3987,.396,.387)) * sqrt(2*pi)
+plot(x,N);plot(x,f);plot(gx,gy);show()
+
+Let's try a gaussian fit near x=1,
+%> python
+from pylab import *
+x = linspace(0.5,1.5,500)
+N = exp(-x**2/2)
+f = 1/sqrt(exp(1)) * array((1-(x-1)+(x-1)**3/3-(x-1)**4/12))
+plot(x,N);plot(x,f);show()
+
+Let's try a gaussian fit near x=2,
+%> python
+from pylab import *
+x = linspace(1.5,2.5,500)
+N = exp(-x**2/2)
+x2 = x-2
+f = 1/(exp(1)**2) * array((1- 2*x2 + 2*x2**2/2 - x2**3/3 - 5*x2**4/24 + 3*x2**5/20))
+plot(x,N);plot(x,f);show()
+## This sucks
+
+## let's try an exponential fit
+from pylab import *
+x1 = 1.75
+x2 = 2.2
+y1 = exp(-x1**2/2)
+y2 = exp(-x2**2/2)
+#
+x = linspace(1.7,2.3,500)
+N = exp(-x**2/2)
+B = log(y1/y2)/(x2-x1); A = y1*exp(B*x1)
+E = A*exp(-B*x)
+plot(x,N);plot(x,E);show()
+plot(x,N-E);show()
+
+## Let's try an exponential fit further out in the tail...
+from pylab import *
+x1 = 3.
+x2 = 3.4
+y1 = exp(-x1**2/2)
+y2 = exp(-x2**2/2)
+#
+x = linspace(3,4,500)
+N = exp(-x**2/2)
+B = log(y1/y2)/(x2-x1); A = y1*exp(B*x1)
+E = A*exp(-B*x)
+plot(x,N);plot(x,E);show()
+plot(x,N-E);show()
+
+### 3/6/12 ########################################################
+
+## And out near the edge of the tails for Gaussian,
+from pylab import *
+x1 = 5.0
+x2 = 5.2
+y1 = exp(-x1**2/2)
+y2 = exp(-x2**2/2)
+#
+x = linspace(5.0,10.0,500)
+N = exp(-x**2/2)
+B = log(y1/y2)/(x2-x1); A = y1*exp(B*x1)
+E = A*exp(-B*x)
+plot(x,N);plot(x,E);show()
+plot(x,N-E);show()
+
+## refer to notes 3/6/12 p.2 ## Do 3rd order curve-fit to 4 points including both endpoints ##
+from pylab import *
+x1 = 3.
+x2 = 4.
+def fit(x1, x2):
+  x1 = float(x1)
+  x2 = float(x2)
+  x = linspace(x1,x2,500)
+  N = exp(-x**2/2)
+  z = (x - x1)/(x2 - x1)  # normalize
+  a = .3  # left midpoint location
+  b = .7  # right midpoint location
+  f1 = exp(-x1**2/2)
+  f2 = exp(-(x1 + a*(x2 - x1))**2/2)
+  f3 = exp(-(x1 + b*(x2 - x1))**2/2)
+  f4 = exp(-x2**2/2)
+  d1 = a*b
+  d2 = (1-a)*(b-a)*a
+  d3 = (1-b)*(b-a)*b
+  d4 = (1-a)*(1-b)
+  c1 =  f1
+  c2 = -f1*(a+b+a*b)/d1 + f2*b    /d2 - f3*a    /d3 + f4*a*b  /d4
+  c3 =  f1*(a+b+1)  /d1 - f2*(b+1)/d2 + f3*(a+1)/d3 - f4*(a+b)/d4
+  c4 = -f1          /d1 + f2      /d2 - f3      /d3 + f4      /d4
+  f  = c1+c2*z+c3*z**2+c4*z**3
+  plot(x,N);plot(x,f);show()
+  plot(x,N-f);show()
+
+Conclusion: Beyond 4-sigmas the 2-point exponential fit is better than the 4-point poly else poly.
+The non-negative breakpoints for gaussian that maintian error <= 1E-4 are
+
+  x in [0, 0.5, 1.2, 1.8, 2.6, 3.4, 4.2] 
+
+  and in the tails (sigma > 4) use the 2-point exponential fit,
+
+  x in [4.2, 5 ]  with points x1 = 4.2, x2 = 4.5
+  x in [5.0, 10]  with points x1 = 5.0, x2 = 5.2  (B = 5.1)
+
+
+That's 17 endpoints!!! while maintaining 1E-4 error tolerance with true density function.
+How many uniform points would it take to accomplish this feat? Let's survey a near-region and a 
+tail region.
+
+%> phox
+N = NormalNumeric(0,1,100)
+
+from numpy import *
+x1 = 1.3939393939393936
+x2 = 1.5151515151515156
+p1 = 0.01680093436792955
+h1 = p1 / (x2 - x1)
+N1 = 1/sqrt(2*pi) * exp(-x1**2/2)
+N2 = 1/sqrt(2*pi) * exp(-x2**2/2)
+max(abs(N1-h1),abs(N2-h1))
+## error is greater that 1E-2 for near-region for n=100
+
+from numpy import *
+x1 = 4.303030303030303
+p1 = 3.584825055104304E-6
+x2 = 4.424242424242425
+h1 = p1 / (x2 - x1)
+N1 = 1/sqrt(2*pi) * exp(-x1**2/2)
+N2 = 1/sqrt(2*pi) * exp(-x2**2/2)
+max(abs(N1-h1),abs(N2-h1))
+## error is 1E-6, which is fine. You just can't be that far off in the tails, afterall
+
+from numpy import *
+x1 = 1.3959339593395939
+p1 = 2.409050536533733E-5
+x2 = 1.3960939609396092
+h1 = p1 / (x2 - x1)
+N1 = 1/sqrt(2*pi) * exp(-x1**2/2)
+N2 = 1/sqrt(2*pi) * exp(-x2**2/2)
+max(abs(N1-h1),abs(N2-h1))
+## Finally at 100,000 endpoints does the error drop to 1.6E-5, but this is scaled by 0.4
+## This means that our 17 point exp-poly curve is equivalent to a 100,000 point PU approximation.
+
+### 4/23/12 ########################################################
+
+Want to create a Sampling-Based version to contrast with NumericRandomVariable: RandomSample
+We'll put in all the same operations found in RandomVariable so that it's a drop-in replacement.
+
+The question now is about the dimension. Currently the NumericRandomVariable is uni-dimensional.
+The RandomSample should be the same (1D). How to represent? Not sure yet. An array seems nice.
+Immutable array, that is. a double[]? I suppose.
+
+One thing, need to seed the random number generator so that we can re-create the sample as needed.
+
+>phox
+from com.tomfielden.random import *
+N = NormalNumeric(0,1,100)
+s = RandomSample.Normal(0,1,100000)    # need 10 million (100 bins) to equal accuracy of Continuous
+t = s.getContinuousRandomVariable(100)
+Plot((Variant(t),N))
+
+DONE: Get Plot to recognize discrete random variables
+DONE: Fix the generation of discrete & continuous random variables from samples.
+
+>phox
+from com.tomfielden.random import *
+C = ChiSquaredNumeric(3,100)
+s = RandomSample.ChiSquared(3,100000)
+t = s.getContinuousRandomVariable(100)
+Plot((Variant(t),C))
+
+This is becoming an interesting way to validate the models. Essentially we do vector processing. The important thing is that the vector length is common to all participants. This allows correlations to be discovered and besides, how can it be otherwise? We have to handle all inputs.
+
+How about comparisons? It's all parallel arrays so a mask makes sense. But wait!
+If I take a 1E6-point sample from each Demand distribution independently then I run the 
+Tables-and-Chairs example, I have two 1E6 point price vectors. It can bin the pairs and re-create the 2D histogram of the joint-price distribution. The rest of the algorithm is masking and mask logic. Prices turn into masked-revenue-classes. A single revenue 1E6-point vector results. This is then binned, converted and presented.
+
+What I don't have is a 3D random variable concept in PHoX. We can't project onto 2D or 1D for that matter. We don't have the concept of 3D masking. Not that we would necessarily want it. How would we solve the Tables-and-Chairs problem in PHoX?
+
+### 4/24/12 ########################################################
+
+>phox
+N = ChiSquaredNumeric(3,100)
+S = ChiSquaredSample (3,100000)
+Plot((N,S))
+
+Now let's recreate the Tables-and-Chairs example fromt the Dissertation with sampling.
+
+>phox
+Num = 10000
+
+Dd = ExponentialSample(2,Num)*4
+Dt = NormalSample     (9,1,Num)
+Dc = ChiSquaredSample (12,Num)+1
+
+Pt = 14*80 / (Dt +   Dd)
+Pc = 24*45 / (Dc + 2*Dd)
+
+MaskA = 2*Pt/3 < Pc
+MaskB =  (Pt/4 < Pc) * (Pc < 2*Pt/3)
+MaskC =   Pc   < Pt/4
+
+RevenueA =  45 * Pc            * MaskA
+RevenueB = (24 * Pc + 14 * Pt) * MaskB
+RevenueC =            20 * Pt  * MaskC
+
+Revenue = RevenueA + RevenueB + RevenueC
+Plot(Revenue)
+
+## Works!! It closely replicates the Tables and Chairs example form the Dissertation.
+
+DONE: Fix the [::-1] idiom. Should reverse the array.
+
+### 4/25/12 ########################################################
+
+Let's recreate the Dissertation Tables and Chairs example in PHoX with RV's
+
+phox>
+Dd = Exponential(2)  * 4
+Dt = Normal     (9,1)
+Dc = ChiSquared (12) + 1
+
+Pt = 14*80 / (Dt +   Dd)
+Pc = 24*45 / (Dc + 2*Dd)
+
+Plot((Pt, Pc))
+
+Num = 1000000
+
+Dds = ExponentialSample(2,Num)  * 4
+Dts = NormalSample     (9,1,Num)
+Dcs = ChiSquaredSample (12,Num) + 1
+
+Pts = 14*80 / (Dts +   Dds)
+Pcs = 24*45 / (Dcs + 2*Dds)
+
+Plot((Pt, Pts))
+Plot((Pc, Pcs))
+
+NOTE: Slight anomally in the left tail of the Pt curve.
+DONE: Fix the extreme difference between 2*Dd and 2*Dds
+DONE: Fix the difference: 2*N(1,1) and 2*Nnumeric(1,1,1000)
+DONE: Fix the difference: 2*Exp(5) and 2*ExpNumeric(5)
+
+Shit! The PHoX engine computes product for Numeric and Lazy differently for Normal and Exponential!
+>phox
+X = Normal(1,1)
+Y = NormalNumeric(1,1,1000)
+
+(4*Y).stdev()  ## should be 2, but it's 4!!! Shitty damn!
+
+>phox
+L = Uniform(1,3)
+N = UniformNumeric(1,3)
+(4*L).getNumericRandomVariable()
+4*N
+## OK
+
+>phox
+N = NormalNumeric(1,1,1000)
+L = Normal(1,1)
+Plot((4*N, 4*L))
+
+So, the Numeric engine appears to be correct, but the Lazy engine is wrong. Let's see.
+
+>phox
+L = Exponential(2)
+A = Variant(((L*4)*2).getLazyRandomVariable().simplify())
+B = Variant((L*(4*2)).getLazyRandomVariable().simplify())
+Plot((A,B))
+# DONE: these two should be the same, but not!!
+
+>phox
+N = ExponentialNumeric(2,1000)
+L = Exponential(2)
+Plot((4*N, 4*L))
+
+Note that we may not have a good rule for the sum or product of exponential distributions. See paper:
+"A new proof that the product of three or more exponential random variables is moment-indeterminate"
+
+Here's what we can do so far...
+
+>phox
+Dd = Exponential(2)  * 4
+Dt = Normal     (9,1)
+Dc = ChiSquared (12) + 1
+
+Pt = 14*80 / (Dt +   Dd)
+Pc = 24*45 / (Dc + 2*Dd)
+
+Plot((Pt, Pc))
+
+### 5/14/2012 ###
+
+x = linspace(0,3,100)
+y = 1/sqrt(2*pi)*exp(-x**2/2)
+Plot(x,y)
+
+## TODO: We need to alter this code to deal with the X,Y < 0 cases
+X = NormalNumeric(1,2,1000)
+Y = NormalNumeric(2,1,1000)
+Z1 = X*Y
+Z2 = exp(log(X) + log(Y))
+Plot((Z1,Z2))
+
+X = ChiSquaredNumeric(2,1000)+.1
+Y = ChiSquaredNumeric(3,1000)+.1
+Z1 = X*Y
+Z2 = exp(log(X) + log(Y))
+Plot((Z1,Z2))
+
+### 5/16/2012 ###
+
+Let's try something from Ivar's book. Page 43, The Mathematics of the Unexpected.
+
+%> phox
+
+alpha = 76.11*2*pi/180
+c     = cos(alpha)
+s     = sin(alpha)
+
+def heron(x,y,N):
+    for i in range(N):
+    	xn = x[-1]
+    	yn = y[-1]
+    	x.append(xn*c - (yn - xn**2)*s)
+    	y.append(xn*s + (yn - xn**2)*c)
+
+
+def ivar(N,M):
+    x = []	
+    y = []
+    for i in range(N):
+    	x.append(random()*2 - 1)
+    	y.append(random()*2 - 1)
+    	heron(x,y,M)
+    Plot(x,y,".")
+
+
+ivar(7,1000)   ## sometimes this fails with a Gnuplot error, not sure why.
+
+### 5/18/2012 ###
+
+Talked to Ronnie Sircar today. The challenge is to represent: Normal(mu,ChiSquare(nu))
+I think the answer is,
+
+%> phox
+mu = 5
+nu = 3
+
+N = Normal(mu,1)
+X = ChiSquared(nu)
+Z = N*sqrt(X)
+#Plot((N,X,Z))
+
+mu = 5
+nu = 3
+XS = ChiSquaredSample(nu,10)
+ns = []
+for i in range(XS.size()): 
+    s = NormalSample(mu, sqrt(XS[i]), 100000)
+    for j in range(s.size()):
+    	ns.append(s[j])
+
+NS = CreateSample(ns)
+Plot(NS)
+
+
+## Bob Burmish's Problem ##
+
+alpha = .7
+n = 3
+X = []
+for i in range(n):
+    X.append(Uniform(0,alpha))
+#
+Y1 = (1+X[0])
+Y2 = (1+X[0])
+for i in range(n-1):
+    Y1 *= (1+X[i+1])
+    Y2 *= (1-X[i+1])
+#
+Z = Y1 + Y2
+Plot(Z)
+
+### 5/21/2012 ###
+
+>>> python
+from pylab import *
+t = linspace(0,pi/2,200)
+
+def r(t,const):
+    s = sin(t)
+    c = cos(t)
+    k = (s+c)/(s*c)
+    return k - sqrt(k**2 - (4-const)/(s*c))
+
+plot(t,r(t,3))
+
+### 5/23/2012 ###
+
+Mixture modeling. We already have the concept for discrete distributions.
+%>phox
+from com.tomfielden.random import NumericRandomVariable
+X1 = NormalNumeric(2,1,1000).getNumericRandomVariable()
+X2 = NormalNumeric(5,2,1000).getNumericRandomVariable()
+X  = Variant(NumericRandomVariable(X1.scale(0.2),X2.scale(0.8)))
+
+It's clear how to mix random variables when the parameter is discrete. When the parameter is continuous, we convert it to discrete by concentrating the continuous probability at the midpoint.
+We then need the function to perform this operation. This allows us to reduce to discrete parameters. We can allocate the sample endpoints among the discrete components based on relative probability! This is now a simple problem because the join is available. We do need to combine pairwise, in a hierarchy until complete, rebalancing at each step.
+
+%>phox
+X = Variant(NormalNumeric(2,1,1000).getNumericRandomVariable().ForceDiscrete())
+Plot(X)
+
+%>phox
+X = ChiSquaredNumeric(3,8)
+N = NormalNumeric(2,X,1000)
+Plot(N)
+Variant(X.getNumericRandomVariable().ForceDiscrete())
+
+D = DiscreteNumeric((5.06,15.18),(0.5,0.5))
+A = Variant(NormalNumeric(2,5.06,10).getNumericRandomVariable().scale(.5))
+B = Variant(NormalNumeric(2,15.18,10).getNumericRandomVariable().scale(.5))
+X = NormalNumeric(2,D,10)
+Plot((A, B, X),"h")
+
+C = ContinuousNumeric((1,2,2.000000001,3),(.8,1E-7,.2,0))
+#C = ContinuousNumeric((0,1,2,2.5,3),(0,.2,.5,.3,0))
+Plot().xrange(0,4).yrange(0,3).plot(C,"h").show()
+
+TODO: Numerically we sometimes get partitions that are incredibly small and these should be removed
+TODO: validate the Continuous mix() function. It's mucking up. We need to rebuild it.
+      The strategy is to build the mutual refinement then loop over each component and fill-in
+      with the assumption that all the endpoints are accounted for. Don't edit out short intervals!
+It seems that my algorith is working correctly, but the gnuplot is being screwed up somehow. The "h" mode isn't working right. This will take some checking into. In the meantime, if I do some annealing of the partition intervals I can probably cure the micro-interval issue. 
+
+### 5/25/2012 ###
+
+DONE: Make Plot do the step-plot correctly. 
+DONE: Create a cumulative plot so we can study the mixing algorithm
+
+%> phox
+C = ContinuousNumeric((1,2,5),(.1,.9,0))
+Plot().xrange(0,6).yrange(0,.5).plot(C).show()
+
+%>phox
+Plot(NormalNumeric(2,ChiSquaredNumeric(3,8),1000))
+Plot().xrange(-15,20).plot(NormalNumeric(2,ChiSquaredNumeric(3,8),1000)).plot(Normal(2,2.05)).show()Plot().xrange(-15,20).plot(NormalNumeric(2,ChiSquaredNumeric(3,8),1000)).plot(Normal(2,2.05)).save("~/junk/mixed.png")
+
+%> phox
+C = ContinuousNumeric((1,2,5),(.1,.9,0))
+Plot(C,"c")
+
+## In this one we do "continuous"=='c' and allow ChiSquared to take on the default number of
+## partition endpoints (~1000). We still need to restrict the Normals to 100 points and
+## still need partition size control -> partition reduction.
+Plot(NormalNumeric(2,sqrt(ChiSquared(3)),100),'c')
+
+TODO: Create partition-reduction algorithm for numeric random variables.
+
+### 5/25/2012 ###
+The idea (flawed) is that we should keep points where the curvature of the log-PDF is high.
+As we see below, for the Normal this would mean throwing away all the middle points! Not OK.
+
+N = NormalNumeric(2,1,100)
+x = N.getMatrix()[2][ ::2]
+y = N.getMatrix()[3][1::2]
+Plot(log(y))
+
+def curve(x,y):
+    c = []
+    for i in range(len(x)-2):
+    	f1 = y[i+0]
+	f2 = y[i+1]
+	f3 = y[i+2]
+    	x1 = x[i+0]
+    	x2 = x[i+1]
+    	x3 = x[i+2]
+    	m1 = (f2-f1)/(x2-x1)
+    	m2 = (f3-f2)/(x3-x2)
+    	y1 = (x1+x2)/2
+    	y2 = (x2+x3)/2
+    	c.append((m2-m1)/(y2-y1))
+    return c
+
+Plot(curve(x,log(y)))
+
+### 5/29/2012 ###
+I have a partition reduction technique, but I don't know how well it will work.
+
+def reduce((x1,x2,x3,x4),(p1,p2,p3)):
+    P  = p1+p2+p3
+    p1 /= P; p2 /= P; p3 /= P  ## normalize probability to 1
+    h1 = p1/(x2-x1)
+    h2 = p2/(x3-x2)
+    h3 = p3/(x4-x3)
+    E  = h1*(x2**2-x1**2)/2 + h2*(x3**2-x2**2)/2+h3*(x4**2-x3**2)/2
+    x1 -= E; x2 -= E; x3 -= E; x4 -= E  ## normalize expectation
+    V  = h1*(x2**3-x1**3)/3 + h2*(x3**3-x2**3)/3+h3*(x4**3-x3**3)/3
+    a  = x1
+    b  = x4
+    if a == -b: return (a,b,b),(P,0)  ## special case (degenerate)
+    y  = -(3*V + a*b)/(a+b)
+    k1 = (y+b)/((y-a)*(b-a))
+    k2 = -(y+a)/((b-a)*(b-y))
+    y1 = a+E; y2 = y+E; y3 = b+E
+    q1 = k1*P; q2 = k2*P
+    return (y1,y2,y3),(q1,q2)
+
+    ## print "heights",h1,h2,h3
+    ## print "probabilities:",P,q1*(y2-y1) + q2*(y3-y2)
+    ## print "expectations (adj):",E, k1*(y2**2-y1**2)/2 + k2*(y3**2-y2**2)/2
+
+## test cases
+reduce((1,3,4,7),(.2,.3,.5))  # y = 0   (fail) perhaps because ^-shaped
+reduce((1,3,4,7),(.4,.1,.9))  # y = 4.8 (pass) perhaps because v-shaped
+x1 = 17.347
+x2 = 17.39
+x3 = 17.414
+x4 = 17.46
+h1 = .001
+h2 = .0009975
+h3 = .0009971
+p1 = h1*(x2-x1)
+p2 = h2*(x3-x2)
+p3 = h3*(x4-x3)
+reduce((x1,x2,x3,x4),(p1,p2,p3))
+
+def tally(x,p):
+    N = len(x)
+    z = 0
+    t = 0
+    for i in range(N-3):
+    	x1 = x[i]; x2 = x[i+1]; x3 = x[i+2]; x4 = x[i+3]
+	p1 = p[i]; p2 = p[i+1]; p3 = p[i+2];
+	if x1 < x2-1E-12 and x2 < x3-1E-12 and x3 < x4-1E-12:
+	    print i, x1, x2, x3, x4
+    	    (y1,y2,y3),(q1,q2) = reduce((x1,x2,x3,x4),(p1,p2,p3))
+	    if y1 <= y2 and y2 <= y3: t += 1
+	else: z += 1
+    return t,z
+
+X = NormalNumeric(2,ChiSquaredNumeric(3,8),1000)
+x = X.getNumericRandomVariable().Continuous().xp_array()[0]
+p = X.getNumericRandomVariable().Continuous().xp_array()[1]
+tally(x,p)
+
+X = NormalNumeric(2,ChiSquaredNumeric(3,3),1000)
+x = X.getNumericRandomVariable().Continuous().xp_array()[0]
+p = X.getNumericRandomVariable().Continuous().xp_array()[1]
+tally(x,p)
+
+## Fix issue
+i = 1527
+reduce((x[i],x[i+1],x[i+2],x[i+3]),(p[i],p[i+1],p[i+2]))
+
+X = NormalNumeric(2,ChiSquared(3),1000)
+x = X.getNumericRandomVariable().Continuous().xp_array()[0]
+p = X.getNumericRandomVariable().Continuous().xp_array()[1]
+tally(x,p)
+
+The above is flawed, but there's a way around. The flaw is that we should not preserve "local" variance since our goal is to preserve global variance. We should restrict ourselves to minimize change in exectation. 
+
+def expect(P, k1, y, i, x):
+    x1 = x[i];  x4 = x[i+3]
+    E2 = k1*(x1-y)*(x4-x1) + P*(y+x4)
+    return E2/2
+
+def foo(i, x, p):
+    x1 = x[i]; x2 = x[i+1]; x3 = x[i+2]; x4 = x[i+3]
+    p1 = p[i]; p2 = p[i+1]; p3 = p[i+2];
+    h1 = p1 / (x2-x1); h2 = p2/(x3-x2); h3 = p3/(x4-x3)
+    print x1,x2,x3,x4
+    print h1,h2,h3
+    x12 = x1**2; x22 = x2**2; x32 = x3**2; x42 = x4**2
+    P  = p1 + p2 + p3
+    E  = 0.5 * (h1*(x22-x12)+h2*(x32-x22)+h3*(x42-x32))
+    return P,E,h1,h2,h3
+
+X = NormalNumeric(2,ChiSquaredNumeric(3,3),1000)
+x = X.getNumericRandomVariable().Continuous().xp_array()[0]
+p = X.getNumericRandomVariable().Continuous().xp_array()[1]
+P,E,h1,h2,h3 = foo(1000,x,p)
+expect(P,0.055,6.2,1000,x)
+
+## Test case 213
+x = (1,3,4,7)
+p = (.4/1.4,.1/1.4,.9/1.4)
+P,E,h1,h2,h3 = foo(0,x,p)
+expect(P,h1,3,0,x)
+
+## Test case 132
+x = (1,3,4,7)
+p = (.1/1.1,.3/1.1,.2/1.1)
+P,E,h1,h2,h3 = foo(0,x,p)
+expect(P,h1,3,0,x); expect(P,h2,3,0,x); expect(P,h1,4,0,x); expect(P,h2,4,0,x)
+h2s = (E - expect(P,h1,3,0,x))*(h2-h1)/(expect(P,h2,3,0,x)-expect(P,h1,3,0,x))+h1
+h3s = (E - expect(P,h1,4,0,x))*(h2-h1)/(expect(P,h2,4,0,x)-expect(P,h1,4,0,x))+h1
+
+## 5/30/2012 ##
+
+## Let's suppose we choose y=(x2+x3)/2 and solve for k1 (and k2)
+
+def half(i, x, p):
+    x1  = x[i]; x2 = x[i+1]; x3 = x[i+2]; x4 = x[i+3]
+    p1  = p[i]; p2 = p[i+1]; p3 = p[i+2];
+    P   = p1 + p2 + p3
+    h1  = p1/(x2-x1); h2 = p2/(x3-x2); h3 = p3/(x4-x3)
+    print "x:",x1,x2,x3,x4
+    print "h:",h1,h2,h3
+    x12 = x1**2; x22 = x2**2; x32 = x3**2; x42 = x4**2
+    E   = 0.5 * (h1*(x22-x12)+h2*(x32-x22)+h3*(x42-x32))
+    y   = (x2+x3)/2.0
+    k1  = (P*(y+x4)-2*E)/((y-x1)*(x4-x1))
+    k2  = (P-k1*(y-x1))/(x4-y)
+    P2  = k1*(y-x1)+k2*(x4-y)
+    E2  = 0.5 * (k1*(y**2-x1**2) + k2*(x4**2-y**2))
+    print "E,P:E,P ",E,P,E2,P2
+    return k1,k2
+
+## Test case 213
+x = (1,3,4,7)
+p = (.4/1.4,.1/1.4,.9/1.4)
+half(0,x,p)
+
+## Test case 132
+x = (1,3,4,7)
+p = (.1/1.1,.3/1.1,.2/1.1)
+half(0,x,p)
+
+## Test case 123
+x = (1,3,4,7)
+p = (.2/1.3,.2/1.3,.9/1.3)
+half(0,x,p)
+
+## Test case 321
+x = (1,3,4,7)
+p = (.6/1.1,.2/1.1,.3/1.1)
+half(0,x,p)
+
+I think we can *always* choose y = (x2+x3)/2 and find k1,k2 that satisfy all requirements of
+preserved P and E as well as min(h) < k1,k2 < max(h) so that we don't disturb "too much".
+
+def test_half(i, x, p):
+    x1  = x[i]; x2 = x[i+1]; x3 = x[i+2]; x4 = x[i+3]
+    p1  = p[i]; p2 = p[i+1]; p3 = p[i+2];
+    P   = p1 + p2 + p3
+    h1  = p1 / (x2-x1); h2 = p2/(x3-x2); h3 = p3/(x4-x3)
+    x12 = x1**2; x22 = x2**2; x32 = x3**2; x42 = x4**2
+    E   = 0.5 * (h1*(x22-x12)+h2*(x32-x22)+h3*(x42-x32))
+    y   = (x2+x3)/2.0
+    k1  = (P*(y+x4)-2*E)/((y-x1)*(x4-x1))
+    k2  = (P-k1*(y-x1))/(x4-y)
+    if k1 < 0: return False
+    if k2 < 0: return False
+    return True
+
+def tally(x,p):
+    N = len(x)
+    z = 0
+    t = 0
+    for i in range(N-3):
+    	x1 = x[i]; x2 = x[i+1]; x3 = x[i+2]; x4 = x[i+3]
+	p1 = p[i]; p2 = p[i+1]; p3 = p[i+2]
+	WIDE = x1 < x2-1E-12 and x2 < x3-1E-12 and x3 < x4-1E-12
+	TALL  = p1 > 1E-12 and p2 > 1E-12 and p3 < 1E-12
+	if WIDE and TALL:
+	   if test_half(i,x,p): t += 1
+	   else: print "failure:",i
+	else: z += 1
+    return t,z
+
+X = NormalNumeric(2,ChiSquaredNumeric(3,100),1000)
+x = X.getNumericRandomVariable().Continuous().xp_array()[0]
+p = X.getNumericRandomVariable().Continuous().xp_array()[1]
+tally(x,p)
+
+## test case 321'
+x = (0,1,2,3)
+p = (49.,46.,39.)
+half(0,x,p)
+
+We're ready to start implementing.
+
+TODO: remove "sliver" partition elements both narrow and unlikely ( < 1E-15, say).
+      merge equal "height/density" partitions
+      remove extra partition elements (preserve P and E)
+      When mixing more than 2 fractional-PDFs work pairwise and 
+      alternate left-to-right and right-to-left
+
+The pairing scheme should do the following,
+    1  2 3  4  5
+     12   34   5
+     12     345
+       12345
+
+X = NormalNumeric(2,ChiSquaredNumeric(3,6),100)
+
+Now have the removerSlivers()
+
+X = NormalNumeric(2,ChiSquaredNumeric(3,1000),1000)
+N = X.getNumericRandomVariable().Continuous()
+N.reduceMiddle(1000)
+
+C = ContinuousNumeric((0,1,2,3),(49,46,39,0)).getNumericRandomVariable().Continuous()
+C.reduceMiddle(2)
+
+Finally this works!
+X = NormalNumeric(2,ChiSquared(3),1000)
+
+## 5/31/2012 ##
+
+Now let's flesh out the mixed model interface.
+
+%> phox
+X = NormalNumeric(2,ChiSquared(3),1000)
+X = NormalNumeric(ChiSquared(3),2,1000)
+
+# found a negative probability value! p[1007]
+x = (-13.852075425408394,-13.463750078589571,-12.136699118167652,-11.836883923983343)
+p = (2.6850071715357954E-15,1.8167535862976958E-14,4.507207922295312E-14,0)
+half(0,x,p)
+
+x = (0,1,2,3)
+p = (1,2,22,0)
+half(0,x,p)
+
+In this case we fail to meet the expectation preservation requirement with non-negative probability
+Here are two (symmetric) solutions which involve relazing the y = (x2+x3)/2 assumption and
+stack the probability all into one side or the other.
+
+  if x1 < 2E/P-x4 < x4 then ((x1,y,x4),(0,p))
+  if x1 < 2E/P-x1 < x4 then ((x1,y,x4),(p,0))
+
+which is the same as (more intuitively),
+
+  if x1        < E/P < (x1+x4)/2 then ((x1,y,x4),(p,0))
+  if (x1+x4)/2 < E/P < x4        then ((x1,y,x4),(0,p))
+
+Fixed. Rather than fleshing this out, let's review the Michael Gordy talk and see what can be done.
+Then we'll send some pix to Ronnie based on that talk.
+
+IMA:
+http://app.ima.umn.edu/myima/
+Username: tom@tomfielden.com
+Password: 210fa39d22
+
+IMA Hot Topic Material:
+http://www.ima.umn.edu/2011-2012/SW5.17-19.12/
+Ronnie Sircar: sircar@princeton.edu
+
+Michael Godry Talk:
+http://www.ima.umn.edu/videos/index.php?id=1892
+
+## 6/4/2012 ##
+
+Need to install a clean-up feature for the discrete binary operations. 
+Here's a test case:
+%> phox
+F = DiscreteNumeric((.95,1.2),(.68,.32))
+F*F
+
+The result is a sequence of nearly idendical values that should be recombined.
+
+### 8/13/12 ###
+
+Creating the Khalifa talk. See the notes in that section.

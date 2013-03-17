@@ -1,6 +1,7 @@
+## The deployment directory ##
+dist/
+reports/
+
+## Java-specific ##
 *.class
 
-# Package Files #
-*.jar
-*.war
-*.ear
