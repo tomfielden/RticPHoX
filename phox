@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+jython -i -c "from com.tomfielden.util import *; from com.tomfielden.util.Functions import *"
